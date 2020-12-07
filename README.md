@@ -3,7 +3,7 @@
 
 # Coding Assignment Distribution | CAD
 
-> The `update.sh` script distributes an assignment repository on given branch _without history_ and creates / updates individual repositories for students.
+> The `update.sh` script distributes a GitLab assignment repository _detaching its history_ into individual repositories for each solver usernames. For future updates it creates a separate `source` branch and creates pull requests into main branch whenever updated. For each solver, the script sets developer rights in newly created repository if username exists.
 
 ## Requirements
 
@@ -29,20 +29,9 @@ For global installation create link in `/usr/local/share`.
 { ~ }  » ln -s "$HOME/cad/update.sh" /usrl/local/share/cad
 ```
 
-To use the script in CI, download standalone copy of script and set permissions.
-
-```
-  ...
-  - curl -O https://raw.githubusercontent.com/InternetGuru/cad/master/update.sh
-  - chmod +x update.sh
-  ...
-```
-
 ## Example CLI Usage
 
-The script creates or updates a GitLab repository in given path (GitLab groups) for each user. Script assigns developer rights to individual student's projects.
-
-1. Create or update assignment repositories for `user1` and `user2` from a project `assn1`
+Distribute a GitLab assignment project into two individual solver repositories.
 
     ```
     cad -n "/umiami/vjm/csc220/fall20/assn1" -u "user1 user2"
@@ -60,7 +49,7 @@ The script creates or updates a GitLab repository in given path (GitLab groups) 
 - [ ] Dry run to verify parameters and print out destinations
 - [ ] In distributed projects make the `source` branch protected
 - [ ] Specify editable files
-- [ ] Add GitHub API support
+- [ ] Add GitHub support
 
 [1]: https://docs.gitlab.com/ee/user/group/
 [2]: https://about.gitlab.com/product/continuous-integration/
