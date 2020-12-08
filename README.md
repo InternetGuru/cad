@@ -3,7 +3,7 @@
 
 # Coding Assignment Distribution | CAD
 
-> The `update.sh` script distributes a GitLab assignment repository _detaching its history_ into individual repositories for each solver usernames. For future updates it creates a separate `source` branch and creates pull requests into main branch whenever updated. For each solver, the script sets developer rights in newly created repository if username exists. This project also provides GitLab CI template (see below).
+> The `update.sh` script distributes a GitLab assignment repository _detaching its history_ into multiple solver repositories. For future updates it creates a separate `source` branch and creates pull requests into main branch whenever updated. For each solver, the script sets developer rights in newly created repository if solver's user account exists. This project also provides GitLab CI template (see below).
 
 ## Requirements
 
@@ -11,23 +11,24 @@
 * Installed `git` with defined user and email
 * Existing (working) project with assignment branch or assignment project
 * GitLab account
-* List of students (GitLab account names)
+* List of solvers, possibly as GitLab user accounts
 
 ## Installation
 
-Simply clone this project into your computer and set alias.
+To install locally, simply clone this project into your home folder and set an alias.
 
-  ```
-  { ~ }  » git clone https://github.com/InternetGuru/cad.git
-  { ~ }  » echo alias cad=\"\$HOME/cad/update.sh\" >> .bashrc
-  { ~ }  » source .bashrc
-  ```
+    ```
+    git clone https://github.com/InternetGuru/cad.git ~
+    echo alias cad=\"\$HOME/cad/update.sh\" >> ~/.bashrc
+    source ~/.bashrc
+    ```
 
-For global installation create link in `/usr/local/share`.
+For global installation, clone into shared folder and create a symbolic link.
 
-```
-{ ~ }  » ln -s "$HOME/cad/update.sh" /usrl/local/share/cad
-```
+    ```
+    sudo git clone https://github.com/InternetGuru/cad.git /usr/local/src
+    sudo ln -s "/usr/local/src/cad/update.sh" /usrl/local/share/cad
+    ```
 
 ## Example CLI Usage
 
@@ -49,16 +50,16 @@ Distribute a GitLab assignment project into two individual solver repositories.
 
 1. Add the following lines into your `.gitlab-ci.yml` file and insert users into `USERS` variable separated by space, e.g. `"student-1 student-2 student-3"`. You may want to select a different [CAD](https://github.com/InternetGuru/cad) revision. Do not modify `CAD_REVISION` variable unless you know what you're doing.
 
-   ```
-   include: 'https://raw.githubusercontent.com/InternetGuru/cad/master/gitlab-distribute.yml'
-
-   variables:
-     USERS: ""
-     CAD_REVISION: "1"
-
-   stages:
-     - distribute
-   ```
+    ```
+    include: 'https://raw.githubusercontent.com/InternetGuru/cad/master/gitlab-distribute.yml'
+ 
+    variables:
+      USERS: ""
+      CAD_REVISION: "1"
+ 
+    stages:
+      - distribute
+    ```
 
 1. [Execute CI pipeline](https://docs.gitlab.com/ee/ci/pipelines/#run-a-pipeline-manually) on desired branch. Assignment projects will be created / updated in `project_namespace/project_branch/project_name`.
 
