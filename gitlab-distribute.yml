@@ -30,8 +30,8 @@ distribute:
     - project_name="$(basename "$PWD")"
     # e.g. fall20
     - branch="$(git rev-parse --abbrev-ref HEAD)"
-    # set remote for update.sh
-    - git -C $tmpcad remote set-url origin "/$namespace/$project_name.git"
+    # set project remote for update.sh
+    - git remote set-url origin "/$namespace/$project_name.git"
     # distribute current project among all users
     - $tmpcad/update.sh -r -n "/$namespace/$branch/$project_name" -u "$USERS" -f "." -b "$branch"
   when: manual
