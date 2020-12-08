@@ -278,8 +278,11 @@ update_user_repo() {
   main_branch="$(git -C "$user_project_folder" remote show origin | grep "HEAD branch:" | tr -d " " | cut -d: -f2)"
   if [[ $REPLACE_README_REMOTE == 1 ]]; then
     project_remote="$(git -C "$project_folder" config remote.origin.url)"
+    echo "$project_remote" >&2
     project_ns="${project_remote#*:}"
     project_ns="${project_ns%.git}"
+    echo "$project_ns" >&2
+    echo "$user_project_ns" >&2
     sed -i "s~$project_ns~$user_project_ns~g" "$user_project_folder/README.md"
     sed -i "s~/$assignment_branch/\(pipeline\|raw\|file\)~/$main_branch/\1~g" "$user_project_folder/README.md"
   fi
