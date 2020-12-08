@@ -27,15 +27,24 @@ For global installation, clone into shared folder and create a symbolic link.
 
     ```
     sudo git clone https://github.com/InternetGuru/cad.git /usr/local/src
-    sudo ln -s "/usr/local/src/cad/update.sh" /usrl/local/share/cad
+    sudo ln -s "/usr/local/src/cad/update.sh" /usr/local/share/cad
     ```
 
 ## Example CLI Usage
 
-Distribute a GitLab assignment project into two individual solver repositories.
+Clone and distribute a GitLab assignment project into individual solver repositories.
 
     ```
-    cad -n "/umiami/vjm/csc220/fall20/assn1" -u "user1 user2"
+    git clone https://gitlab.com/umiami/george/csc220/matrix
+    cad -n "/umiami/george/csc220/sols" -f matrix -u "user1 user2"
+    ```
+
+Clone and distribute a GitLab assignment project into individual solver repositories on specific branch replacing README remote links. This is equivalent to our example of CI usage (below).
+
+    ```
+    git clone https://gitlab.com/umiami/george/csc220/matrix
+    git -C matrix checkout fall20
+    cad -rn "/umiami/george/csc220/fall20/matrix" -f matrix -u "solver1 solver2 solver3"
     ```
 
 ## GitLab CI Usage
@@ -48,7 +57,7 @@ Distribute a GitLab assignment project into two individual solver repositories.
 
    - E.g. [umiami/george/csc220/matrix@fall20](https://gitlab.com/umiami/george/csc220/matrix/-/tree/fall20)
 
-1. Add the following lines into your `.gitlab-ci.yml` file and insert users into `USERS` variable separated by space, e.g. `"student-1 student-2 student-3"`. You may want to select a different [CAD](https://github.com/InternetGuru/cad) revision. Do not modify `CAD_REVISION` variable unless you know what you're doing.
+1. Add the following lines into your `.gitlab-ci.yml` file and insert users into `USERS` variable separated by space, e.g. `"solver1 solver2 solver3"`. You may want to select a different `update.sh` revision. Do not modify `CAD_REVISION` variable unless you know what you're doing.
 
     ```
     include: 'https://raw.githubusercontent.com/InternetGuru/cad/master/gitlab-distribute.yml'
@@ -61,10 +70,9 @@ Distribute a GitLab assignment project into two individual solver repositories.
       - distribute
     ```
 
-1. [Execute CI pipeline](https://docs.gitlab.com/ee/ci/pipelines/#run-a-pipeline-manually) on desired branch. Assignment projects will be created / updated in `project_namespace/project_branch/project_name`.
+1. [Execute CI pipeline](https://docs.gitlab.com/ee/ci/pipelines/#run-a-pipeline-manually) on desired branch. Destination namespace for assignment projects is `project_namespace/project_branch/project_name`.
 
-   - E.g. solver repositories in [umiami/george/csc220/fall20/matrix](https://gitlab.com/umiami/george/csc220/fall20/matrix)
-
+   - E.g. destination namespace is [umiami/george/csc220/fall20/matrix](https://gitlab.com/umiami/george/csc220/fall20/matrix)
 
 ## Known Bugs and Suggestions
 
