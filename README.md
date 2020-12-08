@@ -32,14 +32,14 @@ For global installation, clone into shared folder and create a symbolic link.
 
 ## Example CLI Usage
 
-Clone and distribute a GitLab assignment project into individual solver repositories.
+Clone a GitLab assignment project and distribute it into individual solver repositories.
 
     ```
     git clone https://gitlab.com/umiami/george/csc220/matrix
     cad -n "/umiami/george/csc220/sols" -f matrix -u "user1 user2"
     ```
 
-Clone and distribute a GitLab assignment project into individual solver repositories on specific branch replacing README remote links. This is equivalent to our example of CI usage (below).
+Clone GitLab assignment project into individual solver repositories on specific branch replacing README remote links. This is equivalent to our example of CI usage (below).
 
     ```
     git clone https://gitlab.com/umiami/george/csc220/matrix
