@@ -17,5 +17,6 @@ jobs:
       run: |
         curl -sL https://github.com/InternetGuru/butt/releases/download/v0.3.0/butt.sh > butt
         chmod +x butt
+        export TERM=dumb
     - name: Run tests
       run: ./butt -v test/test.butt
