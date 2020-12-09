@@ -20,7 +20,6 @@ jobs:
         chmod +x butt
     - name: Run tests
       run: |
-        ls -la $GITHUB_WORKSPACE
-        ./butt -v $GITHUB_WORKSPACE/test/test.butt
+        ./butt -v test/test.butt
       env:
         TERM: dumb
