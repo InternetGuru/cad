@@ -1,5 +1,5 @@
 
-![example workflow name](https://github.com/InternetGuru/cad/workflows/tests/badge.svg)
+![tests badge](https://github.com/InternetGuru/cad/workflows/tests/badge.svg)
 
 # Coding Assignment Distribution | CAD
 
