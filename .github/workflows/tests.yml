@@ -1,0 +1,22 @@
+name: Tests
+on: [push]
+
+jobs:
+  shellcheck:
+    name: Shellcheck
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Run ShellCheck
+      uses: ludeeus/action-shellcheck@master
+  test:
+    name: BUTT tests
+    runs-on: ubuntu-latest
+    steps:
+    - name: Install BUTT
+      run: |
+        curl -sL https://github.com/InternetGuru/butt/releases/download/v0.3.0/butt.sh > butt
+        chmod +x butt
+        export PATH="$PATH:$(pwd)"
+    - name: Run tests
+      run: butt -v test/test.butt

@@ -1,0 +1,73 @@
+#!/bin/bash
+
+i=0
+status=""
+ga="update.sh"
+
+#######################################
+## Param validation
+#######################################
+correct_ns="/umiami/test/csc220"
+#######################################
+: $((i++))
+start "help"
+  debug "$ga --help"
+  assert_equal "$status" 0
+  assert_startwith "${outlines[0]}" "DESCRIPTION"
+  assert_startwith "${outlines[1]}" "      update.sh creates or updates"
+end
+#######################################
+: $((i++))
+start "missing -n"
+  debug "$ga -u 'user1'"
+  assert_equal "$status" 2
+  assert_startwith "${errlines[0]}" "Missing or invalid REMOTE_NAMESPACE option"
+end
+#######################################
+: $((i++))
+start "missing -u"
+  debug "$ga -n '$correct_ns'"
+  assert_equal "$status" 2
+  assert_startwith "${errlines[0]}" "Missing or empty GITLAB_USERNAMES option"
+end
+#######################################
+: $((i++))
+start "invalid -u"
+  debug "$ga -n '$correct_ns' -u 'a'"
+  assert_equal "$status" 2
+  assert_startwith "${errlines[0]}" "Invalid user format, value 'a'"
+  debug "$ga -n '$correct_ns' -u 'aaaaaa
+  b'"
+  assert_equal "$status" 2
+  assert_startwith "${errlines[0]}" "Invalid user format, value 'b'"
+end
+#######################################
+: $((i++))
+start "-n invalid format"
+  debug "$ga -n '/umiami' -u 'user1'"
+  assert_equal "$status" 2
+  assert_startwith "${errlines[0]}" "Missing or invalid REMOTE_NAMESPACE option"
+end
+#######################################
+: $((i++))
+start "-u invalid format"
+  debug "$ga -n '$correct_ns' -u 'user1 a'"
+  assert_equal "$status" 2
+  assert_startwith "${errlines[0]}" "Invalid user format, value 'a'"
+end
+#######################################
+: $((i++))
+start "-f invalid path"
+  debug "$ga -n '$correct_ns' -u 'user1' -f '/foo'"
+  assert_equal "$status" 1
+  assert_startwith "${errlines[0]}" "EXCEPTION: /foo is not a directory"
+  assert_equal "${#outlines[@]}" 2
+end
+#######################################
+## Requirements
+#######################################
+: $((i++))
+skip "missing jq"
+: $((i++))
+skip "missing git"
+#######################################
