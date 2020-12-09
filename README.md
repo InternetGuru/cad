@@ -71,7 +71,7 @@
      - distribute
    ```
 
-1. [Execute CI pipeline](https://docs.gitlab.com/ee/ci/pipelines/#run-a-pipeline-manually) on desired branch. Destination namespace for assignment projects is `project_namespace/project_branch/project_name`.
+1. To distribute the assignment, [run **distribute stage** in CI pipeline](https://docs.gitlab.com/ee/ci/pipelines/#run-a-pipeline-manually) on desired branch. Destination namespace for assignment projects is `project_namespace/project_branch/project_name`.
 
    - E.g. destination namespace is [umiami/george/csc220/fall20/matrix](https://gitlab.com/umiami/george/csc220/fall20/matrix)
 
