@@ -1,5 +1,6 @@
 
-![tests badge](https://github.com/InternetGuru/cad/workflows/tests/badge.svg)
+![tests badge at master](https://github.com/InternetGuru/cad/workflows/tests/badge.svg?branch=master)
+![tests badge at dev](https://github.com/InternetGuru/cad/workflows/tests/badge.svg?branch=dev)
 
 # Coding Assignment Distribution | CAD
 
