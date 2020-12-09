@@ -16,37 +16,37 @@
 
 ## Installation
 
-To install locally, simply clone this project into your home folder and set an alias.
+- To install locally, simply clone this project into your home folder and set an alias.
 
-    ```
-    git clone https://github.com/InternetGuru/cad.git ~
-    echo alias cad=\"\$HOME/cad/update.sh\" >> ~/.bashrc
-    source ~/.bashrc
-    ```
+   ```
+   git clone https://github.com/InternetGuru/cad.git ~
+   echo alias cad=\"\$HOME/cad/update.sh\" >> ~/.bashrc
+   source ~/.bashrc
+   ```
 
-For global installation, clone into shared folder and create a symbolic link.
+- For global installation, clone into shared folder and create a symbolic link.
 
-    ```
-    sudo git clone https://github.com/InternetGuru/cad.git /usr/local/src
-    sudo ln -s "/usr/local/src/cad/update.sh" /usr/local/share/cad
-    ```
+   ```
+   sudo git clone https://github.com/InternetGuru/cad.git /usr/local/src
+   sudo ln -s "/usr/local/src/cad/update.sh" /usr/local/share/cad
+   ```
 
 ## Example CLI Usage
 
-Clone a GitLab assignment project and distribute it into individual solver repositories.
+- Clone a GitLab assignment project and distribute it into individual solver repositories.
 
-    ```
-    git clone https://gitlab.com/umiami/george/csc220/matrix
-    cad -n "/umiami/george/csc220/sols" -f matrix -u "user1 user2"
-    ```
+   ```
+   git clone https://gitlab.com/umiami/george/csc220/matrix
+   cad -n "/umiami/george/csc220/sols" -f matrix -u "user1 user2"
+   ```
 
-Clone GitLab assignment project into individual solver repositories on specific branch replacing README remote links. This is equivalent to our example of CI usage (below).
+- Clone GitLab assignment project into individual solver repositories on specific branch replacing README remote links. This is equivalent to our example of CI usage (below).
 
-    ```
-    git clone https://gitlab.com/umiami/george/csc220/matrix
-    git -C matrix checkout fall20
-    cad -rn "/umiami/george/csc220/fall20/matrix" -f matrix -u "solver1 solver2 solver3"
-    ```
+   ```
+   git clone https://gitlab.com/umiami/george/csc220/matrix
+   git -C matrix checkout fall20
+   cad -rn "/umiami/george/csc220/fall20/matrix" -f matrix -u "solver1 solver2 solver3"
+   ```
 
 ## GitLab CI Usage
 
@@ -60,16 +60,16 @@ Clone GitLab assignment project into individual solver repositories on specific 
 
 1. Add the following lines into your `.gitlab-ci.yml` file and insert users into `USERS` variable separated by space, e.g. `"solver1 solver2 solver3"`. You may want to select a different `update.sh` revision. Do not modify `CAD_REVISION` variable unless you know what you're doing.
 
-    ```
-    include: 'https://raw.githubusercontent.com/InternetGuru/cad/master/gitlab-distribute.yml'
- 
-    variables:
-      USERS: ""
-      CAD_REVISION: "1"
- 
-    stages:
-      - distribute
-    ```
+   ```
+   include: 'https://raw.githubusercontent.com/InternetGuru/cad/master/gitlab-distribute.yml'
+
+   variables:
+     USERS: ""
+     CAD_REVISION: "1"
+
+   stages:
+     - distribute
+   ```
 
 1. [Execute CI pipeline](https://docs.gitlab.com/ee/ci/pipelines/#run-a-pipeline-manually) on desired branch. Destination namespace for assignment projects is `project_namespace/project_branch/project_name`.
 
