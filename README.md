@@ -1,6 +1,4 @@
 
-[![Build Status](https://travis-ci.org/InternetGuru/cad.svg?branch=master)](https://travis-ci.org/InternetGuru/cad)
-
 # Coding Assignment Distribution | CAD
 
 > The `update.sh` script distributes a GitLab assignment repository _detaching its history_ into multiple solver repositories. For future updates it creates a separate `source` branch and creates pull requests into main branch whenever updated. For each solver, the script sets developer rights in newly created repository if solver's user account exists. This project also provides GitLab CI template (see below).
