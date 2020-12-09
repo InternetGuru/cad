@@ -281,7 +281,7 @@ update_user_repo() {
     project_ns="${project_remote#*:}"
     project_ns="${project_ns%.git}"
     sed -i "s~$project_ns~$user_project_ns~g" "$user_project_folder/README.md"
-    sed -i "s~/$assignment_branch/~/$main_branch/~g" "$user_project_folder/README.md"
+    sed -i "s~/$assignment_branch/\(pipeline\|raw\|file\)~/$main_branch/\1~g" "$user_project_folder/README.md"
     sed -i "s~ref=$assignment_branch~ref=$main_branch~g" "$user_project_folder/README.md"
   fi
   git_status_empty "$user_project_folder" \
