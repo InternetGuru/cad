@@ -18,6 +18,8 @@ jobs:
         curl -sL https://github.com/InternetGuru/butt/releases/download/v0.3.0/butt.sh > butt
         chmod +x butt
     - name: Run tests
-      run: ./butt -v test/test.butt
+      run: |
+        ls -la test/test.butt
+        ./butt -v test/test.butt
       env:
         TERM: dumb
