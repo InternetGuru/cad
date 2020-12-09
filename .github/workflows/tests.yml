@@ -17,6 +17,5 @@ jobs:
       run: |
         curl -sL https://github.com/InternetGuru/butt/releases/download/v0.3.0/butt.sh > butt
         chmod +x butt
-        export PATH="$PATH:$(pwd)"
     - name: Run tests
-      run: butt -v test/test.butt
+      run: ./butt -v test/test.butt
