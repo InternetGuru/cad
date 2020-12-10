@@ -31,7 +31,7 @@
    sudo ln -s "/usr/local/src/cad/update.sh" /usr/local/share/cad
    ```
 
-## Example CLI Usage
+## CLI Usage
 
 - Clone a GitLab assignment project and distribute it into individual solver repositories.
 
@@ -54,7 +54,7 @@
 
    - E.g. into `umiami/george`
 
-1. Navigate into the project and switch to the branch you want to distribute.
+1. Navigate into the project and switch to the branch you want to distribute. Make sure [the branch is protected](https://docs.gitlab.com/ee/user/project/protected_branches.html).
 
    - E.g. [umiami/george/csc220/matrix@fall20](https://gitlab.com/umiami/george/csc220/matrix/-/tree/fall20)
 
@@ -75,19 +75,20 @@
 
    - E.g. destination namespace is [umiami/george/csc220/fall20/matrix](https://gitlab.com/umiami/george/csc220/fall20/matrix)
 
-## Known Bugs and Suggestions
+## Suggestions
 
-- [x] BASH Linting (Shellcheck)
-- [ ] Automatic Testing, including macOS (BUTT)
-- [x] Add changelog and semantic versioning (git flow)
-- [ ] Configurable destination projects visibility (private / public)
-- [x] Standalone assignment support (with no base project or with no git at all)
-- [ ] Support --quiet / default / --verbose
-- [x] Set users as developers by parameter `-d,--developer=ALWAYS|AUTO|NEVER` (default `AUTO`)
-- [ ] Dry run to verify parameters and print out destinations
-- [ ] In distributed projects make the `source` branch protected
-- [ ] Specify editable files
-- [ ] Add GitHub support
+- [x] Integrate linting check (Shellcheck).
+- [ ] Enhance automatic testing (BUTT).
+- [x] Add changelog and semantic versioning (git flow).
+- [ ] Configurable destination projects visibility (private / public).
+- [x] Standalone assignment support with no base project or with no git at all.
+- [ ] Support --quiet / default / --verbose mode.
+- [x] Set users as developers by parameter `-d,--developer=ALWAYS|AUTO|NEVER` (default `AUTO`).
+- [ ] Introduce dry run to verify parameters and print out destinations.
+- [ ] In distributed projects make the `source` branch protected.
+- [ ] Specify editable files.
+- [ ] Add GitHub support.
+- [ ] Add source project visibility check.
 
 [1]: https://docs.gitlab.com/ee/user/group/
 [2]: https://about.gitlab.com/product/continuous-integration/
