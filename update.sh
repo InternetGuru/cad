@@ -148,7 +148,7 @@ gitlab_api() {
   echo "$output"
 }
 authorize() {
-  [[ -s "$ACCESS_TOKEN_FILE" ]] \
+  [[ -s "$ACCESS_TOKEN_PATH" ]] \
     && return
   prompt "Username"
   username="$REPLY"
@@ -157,7 +157,7 @@ authorize() {
   echo
   gitlab_api "$GITLAB_URL/oauth/token" \
     "{\"grant_type\":\"password\",\"username\":\"$username\",\"password\":\"$password\"}" \
-    | jq -r '.access_token' > "$ACCESS_TOKEN_FILE"
+    | jq -r '.access_token' > "$ACCESS_TOKEN_PATH"
 }
 get_project_id() {
   gitlab_api "$GITLAB_URL/api/v4/projects?search=$(basename "$1")" \
@@ -207,23 +207,24 @@ create_namespace() {
       continue
     fi
     full_path="$full_path/$group"
-    group_id="$(get_group_id "$full_path")" \
+    tmp_group_id="$(get_group_id "$full_path")" \
       || exit 1
-    [[ -n "$group_id" ]] \
-      || group_id="$(create_group "$group" "$group_id")" \
+    [[ -n "$tmp_group_id" ]] \
+      || tmp_group_id="$(create_group "$group" "$group_id")" \
       || exit 1
-    [[ -n "$group_id" ]] \
+    [[ -n "$tmp_group_id" ]] \
       || exception "Unable to get/create group $group"
+    group_id="$tmp_group_id"
   done
   echo "$group_id"
 }
 init_user_repo() {
   user="$1"
   user_id="$2"
-  user_project_ns="$3"
-  group_id="$4"
+  group_id="$3"
+  user_project_ns="$REMOTE_NAMESPACE/$user"
   user_project_folder="$USER_CACHE_FOLDER/$user_project_ns"
-  remote_url="https://oauth2:$TOKEN@gitlab.com$user_project_ns.git"
+  remote_url="https://oauth2:$TOKEN@gitlab.com/$user_project_ns.git"
   err="$(git ls-remote "$remote_url" 2>&1 >/dev/null)"
   if [[ -n "$err" ]]; then
     project_id="$(create_project "$group_id" "$user")" \
@@ -235,13 +236,13 @@ init_user_repo() {
   if [[ -d "$user_project_folder" ]]; then
     # verify local remote
     actual_remote_url="$(git -C "$user_project_folder" config remote.origin.url)"
-    [[ "$actual_remote_url" =~ $user_project_ns ]] \
+    [[ "$actual_remote_url" =~ /$user_project_ns.git$ ]] \
       || exception "Invalid user project remote origin url"
     git_pull "$user_project_folder" "origin $PROJECT_BRANCH:$PROJECT_BRANCH" \
-      || exit $?
+      || exit 1
   else
     # clone existing remote
-    git clone -q "$remote_url" "$user_project_folder" \
+    git clone -q "$remote_url" "$user_project_folder" 2>/dev/null \
       || exception "Unable to clone user project $user_project_ns"
   fi
   # create first commit in case of empty repo (stay on main branch for update)
@@ -255,21 +256,19 @@ init_user_repo() {
     || exception "Missing $PROJECT_BRANCH"
 }
 update_user_repo() {
-  project_folder="$1"
-  user_project_ns="$2"
-  assignment_branch="$3"
+  user_project_ns="$REMOTE_NAMESPACE/$1"
   user_project_folder="$USER_CACHE_FOLDER/$user_project_ns"
   # update from assignment
-  rsync -a --delete --exclude .git/ "$project_folder/" "$user_project_folder"
+  rsync -a --delete --exclude .git/ "$PROJECT_FOLDER/" "$user_project_folder"
   # replace remote in README.md
   main_branch="$(git -C "$user_project_folder" remote show origin | grep "HEAD branch:" | tr -d " " | cut -d: -f2)"
   if [[ $REPLACE_README_REMOTE == 1 ]]; then
-    project_remote="$(git -C "$project_folder" config remote.origin.url)"
+    project_remote="$(git -C "$PROJECT_FOLDER" config remote.origin.url)"
     project_ns="${project_remote#*:}"
     project_ns="${project_ns%.git}"
-    sed -i "s~$project_ns~$user_project_ns~g" "$user_project_folder/README.md"
-    sed -i "s~/$assignment_branch/\(pipeline\|raw\|file\)~/$main_branch/\1~g" "$user_project_folder/README.md"
-    sed -i "s~ref=$assignment_branch~ref=$main_branch~g" "$user_project_folder/README.md"
+    sed -i "s~/$project_ns/~/$user_project_ns/~g" "$user_project_folder/README.md"
+    sed -i "s~/$ASSIGNMENT_BRANCH/\(pipeline\|raw\|file\)~/$main_branch/\1~g" "$user_project_folder/README.md"
+    sed -i "s~ref=$ASSIGNMENT_BRANCH~ref=$main_branch~g" "$user_project_folder/README.md"
   fi
   git_status_empty "$user_project_folder" \
     && return
@@ -282,28 +281,36 @@ update_user_repo() {
   # create PR iff new commit
   git_same_commit "$main_branch" "$PROJECT_BRANCH" "$user_project_folder" \
     && return
-  create_request "${user_project_ns#/}" "$main_branch" "$PROJECT_BRANCH"
+  create_request "$user_project_ns" "$main_branch" "$PROJECT_BRANCH"
 }
 
-## default options
+## default global variables
 SCRIPT_NAME="$(basename "$0")"
 REMOTE_NAMESPACE=""
 PROJECT_FOLDER="." # current folder
 ASSIGNMENT_BRANCH="" # current branch
-GITLAB_USERNAMES=""
+USER_LIST=""
 REPLACE_README_REMOTE=0
 DEV_MODE="auto"
+CACHE_FOLDER=".cad_cache"
+USER_CACHE_FOLDER="$HOME/$CACHE_FOLDER"
+GITLAB_URL="https://gitlab.com"
+ACCESS_TOKEN_FILE=".gitlab_access_token"
+ACCESS_TOKEN_PATH="$HOME/$ACCESS_TOKEN_FILE"
+DONE=" done "
+PROJECT_BRANCH="source"
+
 
 ## usage
 USAGE="$(format_usage "DESCRIPTION
-      $SCRIPT_NAME creates or updates one or more repositories from PROJECT_FOLDER and ASSIGNMENT_BRANCH. For each USER from GITLAB_USERNAMES remote repository path is REMOTE_NAMESPACE/USER.
+      $SCRIPT_NAME distributes PROJECT_FOLDER into one or more repositories. The remote repository path for each USER from USER_LIST is REMOTE_NAMESPACE/USER.
 
-      It uses temp folder in ~/.ga-cache for repositories. Supports GitLab API and uses access token at ~/.gitlab_access_token to authorize. Prompts credentials if access token not found.
+      The script uses ~/$CACHE_FOLDER folder to cache repositories and access token at ~/$ACCESS_TOKEN_FILE to authorize. Prompts credentials if access token is not found.
 
-      All created repositories are owned by the authenticated user and their visibility is private. Each repository has appropriate user assigned with developer rights.
+      All created repositories are owned by the authenticated user and their visibility is set to private. Each repository has appropriate user assigned with developer rights if USER is an existing GitLab username.
 
 USAGE
-      $SCRIPT_NAME -n REMOTE_NAMESPACE -u GITLAB_USERNAMES [-rh] [-f PROJECT_FOLDER] [-b ASSIGNMENT_BRANCH]
+      $SCRIPT_NAME -n REMOTE_NAMESPACE -u USER_LIST [-rh] [-f PROJECT_FOLDER] [-b ASSIGNMENT_BRANCH]
 
 OPTIONS
       -b, --branch=ASSIGNMENT_BRANCH
@@ -319,13 +326,13 @@ OPTIONS
               Display usage.
 
       -n, --namespace=REMOTE_NAMESPACE
-              GitLab root namespace, where root must exist, e.g. /umiami/victor/csc220/asn1
+              GitLab root namespace, where root must exist, e.g. umiami/george/csc220/fall20
 
       -r, --replace
               Replace any occurrence of assignment project remote URL with user project remote URL in README.md file.
 
-      -u, --usernames=GITLAB_USERNAMES
-              List of one or more GitLab usernames separated by space or newline, where each user must exist.
+      -u, --usernames=USER_LIST
+              List of one or more solvers separated by space or newline, e.g. 'user1 user2'.
 ")"
 
 ## option preprocessing
@@ -344,38 +351,31 @@ eval set -- "$LINE"
 while [ $# -gt 0 ]; do
   case $1 in
     -b|--branch) shift; ASSIGNMENT_BRANCH="$1"; shift ;;
-    -d|--developer) shift; set_dev_mode "$1" || exit $?; shift ;;
+    -d|--developer) shift; set_dev_mode "$1" || exit 2; shift ;;
     -f|--folder) shift; PROJECT_FOLDER="$1"; shift ;;
     -h|--help) echo -e "$USAGE" && exit 0 ;;
     -n|--namespace) shift; REMOTE_NAMESPACE="$1"; shift ;;
     -r|--replace) REPLACE_README_REMOTE=1; shift ;;
-    -u|--usernames) shift; GITLAB_USERNAMES="$1"; shift ;;
+    -u|--usernames) shift; USER_LIST="$1"; shift ;;
     --) shift; break ;;
     *-) echo "$0: Unrecognized option '$1'" >&2; exit 2 ;;
      *) break ;;
   esac
 done
 
-## globals
-GITLAB_URL="https://gitlab.com"
-ACCESS_TOKEN_FILE="$HOME/.gitlab_access_token"
-USER_CACHE_FOLDER="$HOME/.ga-cache"
-DONE=" done "
-PROJECT_BRANCH="source"
-
 # parameter validation
-[[ ! "$REMOTE_NAMESPACE" =~ ^(/[a-z][a-z0-9]{2,}){3,}$ ]] \
+[[ ! "$REMOTE_NAMESPACE" =~ ^[a-z0-9]{2,}(/[a-z0-9]{2,}){2,}$ ]] \
   && error "Missing or invalid REMOTE_NAMESPACE option, value '$REMOTE_NAMESPACE'" \
   && exit 2
 usernames=0
-for user in $GITLAB_USERNAMES; do
+for user in $USER_LIST; do
   [[ ! "$user" =~ ^[a-z][a-z0-9_-]{4,}$ ]] \
     && error "Invalid user format, value '$user'" \
     && exit 2
   : $((usernames++))
 done
 [[ $usernames == 0 ]] \
-  && error "Missing or empty GITLAB_USERNAMES option" \
+  && error "Missing or empty USER_LIST option" \
   && exit 2
 
 PROJECT_FOLDER="$(readlink -f "$PROJECT_FOLDER")"
@@ -410,7 +410,7 @@ fi
 
 authorize \
   || exception "Unable to authorize"
-TOKEN="$(cat "$ACCESS_TOKEN_FILE")"
+TOKEN="$(cat "$ACCESS_TOKEN_PATH")"
 
 # process users
 msg_start "Creating / checking remote path $REMOTE_NAMESPACE"
@@ -420,7 +420,7 @@ group_id="$(get_group_id "$REMOTE_NAMESPACE")" \
   || group_id="$(create_namespace "$REMOTE_NAMESPACE")" \
   || exit 1
 msg_end "$DONE"
-for user in $GITLAB_USERNAMES; do
+for user in $USER_LIST; do
   # check user
   user_id=""
   [[ $DEV_MODE == "none" ]] \
@@ -429,11 +429,10 @@ for user in $GITLAB_USERNAMES; do
   [[ $DEV_MODE == "always" && -z "$user_id" ]] \
     && "User $user does not exist [ skipped ]" \
     && continue
-  # set user project ns and update user
-  user_project_ns="$REMOTE_NAMESPACE/$user"
+  # update user
   msg_start "Updating user repository for $user"
-  init_user_repo "$user" "$user_id" "$user_project_ns" "$group_id" \
-    && update_user_repo "$PROJECT_FOLDER" "$user_project_ns" "$ASSIGNMENT_BRANCH" \
-    || exit $?
+  init_user_repo "$user" "$user_id" "$group_id" \
+    && update_user_repo "$user" \
+    || exit 1
   msg_end "$DONE"
 done

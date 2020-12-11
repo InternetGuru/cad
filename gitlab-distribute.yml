@@ -31,7 +31,7 @@ distribute:
     # e.g. fall20
     - branch="$(git rev-parse --abbrev-ref HEAD)"
     # set project remote for update.sh
-    - git remote set-url origin "/$namespace/$project_name.git"
+    - git remote set-url origin "$namespace/$project_name.git"
     # distribute current project among all users
-    - $tmpcad/update.sh -r -n "/$namespace/$branch/$project_name" -u "$USERS" -b "$branch"
+    - $tmpcad/update.sh -r -n "$namespace/$branch/$project_name" -u "$USERS" -b "$branch"
   when: manual

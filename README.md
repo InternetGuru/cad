@@ -37,7 +37,7 @@
 
    ```
    git clone https://gitlab.com/umiami/george/csc220/matrix
-   cad -n "/umiami/george/csc220/sols" -f matrix -u "user1 user2"
+   cad -n "umiami/george/csc220/sols" -f matrix -u "user1 user2"
    ```
 
 - Clone GitLab assignment project into individual solver repositories on specific branch replacing README remote links. This is equivalent to our example of CI usage (below).
@@ -45,7 +45,7 @@
    ```
    git clone https://gitlab.com/umiami/george/csc220/matrix
    git -C matrix checkout fall20
-   cad -rn "/umiami/george/csc220/fall20/matrix" -f matrix -u "solver1 solver2 solver3"
+   cad -rn "umiami/george/csc220/fall20/matrix" -f matrix -u "solver1 solver2 solver3"
    ```
 
 ## GitLab CI Usage
