@@ -78,6 +78,7 @@ git_current_branch() {
   # shellcheck disable=SC2086
   out="$(git -C "${1:-.}" rev-parse --abbrev-ref HEAD)" \
     || exception "$out"
+  echo "$out"
 }
 git_same_commit() {
   [[ "$( git -C "${3:-.}" rev-parse "$1" )" == "$( git -C "${3:-.}" rev-parse "$2" )" ]]
@@ -179,11 +180,8 @@ create_request() {
     \"remove_source_branch\": \"false\", \"title\": \"Update from $SOURCE_BRANCH branch\"}" >/dev/null
 }
 create_project() {
-  default_branch=
-  [[ -n "$PROJECT_BRANCH" ]] \
-    && default_branch=", \"default_branch\":\"$PROJECT_BRANCH\""
   gitlab_api "$GITLAB_URL/api/v4/projects" \
-    "{\"namespace_id\":\"$1\", \"name\":\"$2\", \"visibility\":\"private\"$default_branch}" \
+    "{\"namespace_id\":\"$1\", \"name\":\"$2\", \"visibility\":\"private\"}" \
     | jq -r '.id'
 }
 add_developer() {
@@ -263,18 +261,28 @@ init_user_repo() {
   git_checkout "$SOURCE_BRANCH" "$user_project_folder" \
     || exception "Missing $SOURCE_BRANCH"
 }
+replace_readme() {
+  user_project_ns="$1"
+  user_project_folder="$2"
+  main_branch="$3"
+  project_remote="$(git -C "$PROJECT_FOLDER" config remote.origin.url)"
+  project_ns="${project_remote#*:}"
+  project_ns="${project_ns%.git}"
+  sed -i "s~/$project_ns/~/$user_project_ns/~g" "$user_project_folder/README.md"
+  [[ -z "$PROJECT_BRANCH" ]] \
+    && return
+  sed -i "s~/$PROJECT_BRANCH/\(pipeline\|raw\|file\)~/$main_branch/\1~g" "$user_project_folder/README.md"
+  sed -i "s~ref=$PROJECT_BRANCH~ref=$main_branch~g" "$user_project_folder/README.md"
+}
 update_user_repo() {
   user_project_ns="$REMOTE_NAMESPACE/$1"
   user_project_folder="$USER_CACHE_FOLDER/$user_project_ns"
   # update from assignment
   rsync -a --delete --exclude .git/ "$PROJECT_FOLDER/" "$user_project_folder"
   # replace remote in README.md
-  if [[ $REPLACE_README_REMOTE == 1 ]]; then
-    project_remote="$(git -C "$PROJECT_FOLDER" config remote.origin.url)"
-    project_ns="${project_remote#*:}"
-    project_ns="${project_ns%.git}"
-    sed -i "s~/$project_ns/~/$user_project_ns/~g" "$user_project_folder/README.md"
-  fi
+  main_branch="$(git -C "$user_project_folder" remote show origin | grep "HEAD branch:" | tr -d " " | cut -d: -f2)"
+  [[ $REPLACE_README_REMOTE == 1 ]] \
+    && replace_readme "$user_project_ns" "$user_project_folder" "$main_branch"
   git_status_empty "$user_project_folder" \
     && return
   # commit
@@ -284,7 +292,6 @@ update_user_repo() {
   git_checkout "-B $SOURCE_BRANCH" "$user_project_folder"
   git_push "--all" "$user_project_folder"
   # create PR iff new commit
-  main_branch="$(git -C "$user_project_folder" remote show origin | grep "HEAD branch:" | tr -d " " | cut -d: -f2)"
   git_same_commit "$main_branch" "$SOURCE_BRANCH" "$user_project_folder" \
     && return
   create_request "$user_project_ns" "$main_branch" "$SOURCE_BRANCH"
@@ -398,15 +405,9 @@ msg_end "$DONE"
 msg_start "Checking paths"
 [[ ! -d "$PROJECT_FOLDER" ]] \
   && exception "$PROJECT_FOLDER is not a directory"
+[[ $REPLACE_README_REMOTE == 1 && ! -f "$PROJECT_FOLDER/README.md" ]] \
+  && exception "Project folder missing README.md"
 msg_end "$DONE"
-if [[ $REPLACE_README_REMOTE == 1 ]]; then
-  msg_start "Checking replace readme remote (param -r)"
-  git_remote_exists "origin" "$PROJECT_FOLDER" \
-    || exception "Project folder missing remote url"
-  [[ -f "$PROJECT_FOLDER/README.md" ]] \
-    || exception "Project folder missing README.md"
-  msg_end "$DONE"
-fi
 
 authorize \
   || exception "Unable to authorize"
