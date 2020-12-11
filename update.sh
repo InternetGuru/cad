@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # set -x
+set -o pipefail
 
 ## functions
 clear_stdin() {
@@ -27,7 +28,7 @@ prompt() {
   echo -n "${1:-Enter value}: "
   clear_stdin
   # do not echo output (e.g. for password)
-  if [[ ${2:-} == silent ]]; then
+  if [[ $2 == silent ]]; then
     read -rs
   else
     read -r
@@ -64,7 +65,7 @@ format_usage() {
   echo -e "$1" | fmt -w "$(tput cols)"
 }
 check_command() {
-  command -v "${1:-}" >/dev/null 2>&1
+  command -v "$1" >/dev/null 2>&1
 }
 git_repo_exists() {
   [[ -d "${1:-.}/.git" ]]
@@ -105,7 +106,7 @@ git_remote_exists() {
 git_pull() {
   local out
   # shellcheck disable=SC2086
-  out="$(git -C "${1:-.}" pull ${2:-} 2>&1)" \
+  out="$(git -C "${1:-.}" pull $2 2>&1)" \
     || exception "$out"
 }
 git_merge() {
@@ -123,7 +124,7 @@ git_push() {
 git_commit() {
   local out
   # shellcheck disable=SC2086
-  out="$(git -C "${2:-.}" commit ${3:-} -m "$1" 2>&1)" \
+  out="$(git -C "${2:-.}" commit $3 -m "$1" 2>&1)" \
     || exception "$out"
 }
 git_fetch_all() {
@@ -131,120 +132,105 @@ git_fetch_all() {
   out="$(git -C "${1:-.}" fetch --all 2>&1)" \
     || exception "$out"
 }
+gitlab_api() {
+  req=GET
+  [[ -n "$2" ]] \
+    && req=POST
+  response=$(curl --silent --write-out "\n%{http_code}\n" \
+    --header "Authorization: Bearer $TOKEN" \
+    --header "Content-Type: application/json" \
+    --request $req --data "${2:-{\}}" "$1")
+  status="$(echo "$response" | sed -n '$p')"
+  output="$(echo "$response" | sed '$d')"
+  [[ "$status" != 20* ]] \
+    && echo "$output" >&2 \
+    && exception "Invalid request $1 [$status]"
+  echo "$output"
+}
 authorize() {
-  [[ -f "$ACCESS_TOKEN_FILE" ]] \
+  [[ -s "$ACCESS_TOKEN_FILE" ]] \
     && return
   prompt "Username"
   username="$REPLY"
   prompt "Password" silent
   password="$REPLY"
   echo
-  response="$(curl \
-    --silent \
-    --data "grant_type=password&username=$username&password=$password" \
-    --request POST "$GITLAB_URL/oauth/token")"
-  error="$(echo "$response" | jq -r '.error')"
-  [[ "$error" != "null" ]] \
-    && exception "$error: $(echo "$response" | jq -r '.error_description')"
-  echo "$response" | jq -r '.access_token' > "$ACCESS_TOKEN_FILE"
+  gitlab_api "$GITLAB_URL/oauth/token" \
+    "{\"grant_type\":\"password\",\"username\":\"$username\",\"password\":\"$password\"}" \
+    | jq -r '.access_token' > "$ACCESS_TOKEN_FILE"
 }
 get_project_id() {
-  response="$(curl -s --header "Authorization: Bearer $TOKEN" "$GITLAB_URL/api/v4/projects?search=$(basename "${1:-}")")"
-  project_id="$(echo "$response" | jq -r --arg ns "${1:-}" '.[] | select(.path_with_namespace==$ns) | .id')"
-  [[ -n "$project_id" ]] \
-    || exception "Project '${1:-}' not found"
-  echo "$project_id"
+  gitlab_api "$GITLAB_URL/api/v4/projects?search=$(basename "$1")" \
+    | jq -r --arg ns "$1" '.[] | select(.path_with_namespace==$ns) | .id'
 }
 get_group_id() {
-  response="$(curl -s --header "Authorization: Bearer $TOKEN" "$GITLAB_URL/api/v4/groups?search=$1")"
-  group_id="$(echo "$response" | jq -r --arg group_name "${1:-}" '.[] | select(.full_path==$group_name) | .id')"
-  [[ -z "$group_id" ]] \
-    && exception "${1:-} group does not exist" 2
-  echo "$group_id"
+  gitlab_api "$GITLAB_URL/api/v4/groups?search=$1" \
+    | jq -r --arg full_path "$1" '.[] | select(.full_path==$full_path) | .id'
 }
-get_origin_url() {
-  response="$(curl -s --header "Authorization: Bearer $TOKEN" "$GITLAB_URL/api/v4/projects?search=${2:-}")"
-  repo_url="$(echo "$response" | jq -r --argjson group_name "${1:-}" --arg project_name "${2:-}" '.[] | select(.namespace.id==$group_name and .name==$project_name) | .ssh_url_to_repo')"
-  if [[ -z "$repo_url" ]]; then
-    repo_url="$(create_project "$1" "$2" "$3")" \
-      || exit $?
-  fi
-  echo "https://oauth2:$TOKEN@gitlab.com/${repo_url#*:}"
-}
-create_pr() {
-  project_id="$(get_project_id "${1:-}")"
-  response="$(curl -s --header "Authorization: Bearer $TOKEN" \
-    -X POST "$GITLAB_URL/api/v4/projects/$project_id/merge_requests" -H "Content-Type: application/json" \
-    -d "{\"id\":\"$project_id\", \"source_branch\":\"$PROJECT_BRANCH\", \"target_branch\":\"master\", \
-    \"remove_source_branch\": \"false\", \"title\": \"Update from $PROJECT_BRANCH branch\"}")"
-  error="$(echo "$response" | jq -r '.error')"
-  [[ "$error" == "null" ]] \
-    || exception "$error: $(echo "$response" | jq -r '.error_description')"
+create_request() {
+  project_id="$(get_project_id "$1")" \
+    || [[ -n "$project_id" ]] \
+    || exit 1
+  gitlab_api "$GITLAB_URL/api/v4/projects/$project_id/merge_requests" \
+    "{\"id\":\"$project_id\", \"source_branch\":\"$PROJECT_BRANCH\", \"target_branch\":\"master\", \
+    \"remove_source_branch\": \"false\", \"title\": \"Update from $PROJECT_BRANCH branch\"}" >/dev/null
 }
 create_project() {
-  local repo_url
-  response="$(curl -s --header "Authorization: Bearer $TOKEN" \
-    -X POST "$GITLAB_URL/api/v4/projects" -H "Content-Type: application/json" -d "{\"namespace_id\":\"${1:-}\", \"name\":\"${2:-}\", \"visibility\":\"private\"}")"
-  repo_url="$(echo "$response" | jq -r '.ssh_url_to_repo')"
-  project_id="$(echo "$response" | jq -r '.id')"
-  [[ "$repo_url" == "null" ]] \
-    && exception "$(echo "$response" | jq -r '.message.name')"
-  [[ -z "${3:-}" ]] \
-    || add_developer "$project_id" "$3" \
-    || exit $?
-  echo "$repo_url"
+  gitlab_api "$GITLAB_URL/api/v4/projects" \
+    "{\"namespace_id\":\"$1\", \"name\":\"$2\", \"visibility\":\"private\"}" \
+    | jq -r '.id'
 }
 add_developer() {
-  response="$(curl -s --header "Authorization: Bearer $TOKEN" \
-    -X POST "$GITLAB_URL/api/v4/projects/${1:-}/members" -H "Content-Type: application/json" -d "{\"access_level\":\"30\", \"user_id\":\"${2:-}\"}")"
-  error="$(echo "$response" | jq -r '.error')"
-  [[ "$error" == "null" ]] \
-    || exception "$error: $(echo "$response" | jq -r '.error_description')"
+  gitlab_api "$GITLAB_URL/api/v4/projects/$1/members" \
+    "{\"access_level\":\"30\", \"user_id\":\"$2\"}" >/dev/null
 }
 create_group() {
-  response="$(curl -s --header "Authorization: Bearer $TOKEN" \
-    -X POST "$GITLAB_URL/api/v4/groups?name=${1:-}&path=${1:-}&parent_id=${2:-}")"
-  group_id="$(echo "$response" | jq -r '.id')"
-  [[ -n "$group_id" && "$group_id" != "null" ]] \
-    || exception "Unable to create group ${1:-}"
-  echo "$group_id"
+  gitlab_api "$GITLAB_URL/api/v4/groups?name=$1&path=$1&parent_id=$2" "{}" \
+    | jq -r '.id'
 }
 get_user_id() {
-  response="$(curl -s --header "Authorization: Bearer $TOKEN" \
-    -X GET "$GITLAB_URL/api/v4/users?username=${1:-}")"
-  id="$(echo "$response" | jq -r '.[] | .id')"
-  [[ -n "$id" && "$id" != "null" ]] \
-    || exception "User ${1:-} is not a registered gitlab user"
-  echo "$id"
+  gitlab_api "$GITLAB_URL/api/v4/users?username=$1" \
+    | jq -r '.[] | .id' | sed 's/null//'
 }
-create_groups() {
+create_namespace() {
   # check or create subgroups
   group_id=
   full_path=
-  for group in $(echo "${1:-}" | tr '/' ' '); do
+  for group in $(echo "$1" | tr '/' ' '); do
     # root group must exist
     if [[ -z "$group_id" ]]; then
       full_path="$group"
       group_id="$(get_group_id "$full_path")" \
-        || exit $?
+        || exit 1
+      [[ -z "$group_id" ]] \
+        && exception "Root group $group does not exist"
       continue
     fi
     full_path="$full_path/$group"
-    tmp_group_id="$(get_group_id "$full_path" 2>/dev/null)" \
-      || tmp_group_id="$(create_group "$group" "$group_id")" \
-      || exit $?
-    group_id="$tmp_group_id"
+    group_id="$(create_group "$group" "$group_id")"
+    [[ -n "$group_id" ]] \
+      || group_id="$(get_group_id "$full_path")" \
+      || exit 1
+    [[ -n "$group_id" ]] \
+      || exception "Unable to get/create group $group"
   done
   echo "$group_id"
 }
 init_user_repo() {
-  user="${1:-}"
-  user_id="${2:-}"
-  user_project_ns="${3:-}"
-  group_id="${4:-}"
+  user="$1"
+  user_id="$2"
+  user_project_ns="$3"
+  group_id="$4"
   user_project_folder="$USER_CACHE_FOLDER/$user_project_ns"
-  # get (or create) remote
-  remote_url="$(get_origin_url "$group_id" "$user" "$user_id")"
+  remote_url="https://oauth2:$TOKEN@gitlab.com$user_project_ns.git"
+  err="$(git ls-remote "$remote_url" 2>&1 >/dev/null)"
+  if [[ -n "$err" ]]; then
+    project_id="$(create_project "$group_id" "$user")" \
+      || exit 1
+    [[ -z "$user_id" ]] \
+      || add_developer "$project_id" "$user_id" \
+      || exit 1
+  fi
   if [[ -d "$user_project_folder" ]]; then
     # verify local remote
     actual_remote_url="$(git -C "$user_project_folder" config remote.origin.url)"
@@ -254,7 +240,7 @@ init_user_repo() {
       || exit $?
   else
     # clone existing remote
-    git clone -q "$remote_url" "$user_project_folder" 2>/dev/null \
+    git clone -q "$remote_url" "$user_project_folder" \
       || exception "Unable to clone user project $user_project_ns"
   fi
   # create first commit in case of empty repo (stay on main branch for update)
@@ -268,9 +254,9 @@ init_user_repo() {
     || exception "Missing $PROJECT_BRANCH"
 }
 update_user_repo() {
-  project_folder="${1:-}"
-  user_project_ns="${2:-}"
-  assignment_branch="${3:-}"
+  project_folder="$1"
+  user_project_ns="$2"
+  assignment_branch="$3"
   user_project_folder="$USER_CACHE_FOLDER/$user_project_ns"
   # update from assignment
   rsync -a --delete --exclude .git/ "$project_folder/" "$user_project_folder"
@@ -295,7 +281,7 @@ update_user_repo() {
   # create PR iff new commit
   git_same_commit "$main_branch" "$PROJECT_BRANCH" "$user_project_folder" \
     && return
-  create_pr "${user_project_ns#/}" "$main_branch" "$PROJECT_BRANCH"
+  create_request "${user_project_ns#/}" "$main_branch" "$PROJECT_BRANCH"
 }
 
 ## default options
@@ -427,15 +413,20 @@ TOKEN="$(cat "$ACCESS_TOKEN_FILE")"
 
 # process users
 msg_start "Creating / checking remote path $REMOTE_NAMESPACE"
-group_id="$(create_groups "$REMOTE_NAMESPACE")" \
-  || exit $?
+group_id="$(get_group_id "$REMOTE_NAMESPACE")" \
+  || exit 1
+[[ -n "$group_id" ]] \
+  || group_id="$(create_namespace "$REMOTE_NAMESPACE")" \
+  || exit 1
 msg_end "$DONE"
 for user in $GITLAB_USERNAMES; do
   # check user
   user_id=""
   [[ $DEV_MODE == "none" ]] \
-    || user_id="$(get_user_id "$user")"
+    || user_id="$(get_user_id "$user")" \
+    || exit 1
   [[ $DEV_MODE == "always" && -z "$user_id" ]] \
+    && "User $user does not exist [ skipped ]" \
     && continue
   # set user project ns and update user
   user_project_ns="$REMOTE_NAMESPACE/$user"
