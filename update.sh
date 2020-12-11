@@ -192,7 +192,7 @@ get_user_id() {
   gitlab_api "$GITLAB_URL/api/v4/users?username=$1" \
     | jq -r '.[] | .id' | sed 's/null//'
 }
-create_groups() {
+create_namespace() {
   # check or create subgroups
   group_id=
   full_path=
@@ -416,7 +416,7 @@ msg_start "Creating / checking remote path $REMOTE_NAMESPACE"
 group_id="$(get_group_id "$REMOTE_NAMESPACE")" \
   || exit 1
 [[ -n "$group_id" ]] \
-  || group_id="$(create_groups "$REMOTE_NAMESPACE")" \
+  || group_id="$(create_namespace "$REMOTE_NAMESPACE")" \
   || exit 1
 msg_end "$DONE"
 for user in $GITLAB_USERNAMES; do
