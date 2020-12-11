@@ -207,9 +207,10 @@ create_namespace() {
       continue
     fi
     full_path="$full_path/$group"
-    group_id="$(create_group "$group" "$group_id")"
+    group_id="$(get_group_id "$full_path")" \
+      || exit 1
     [[ -n "$group_id" ]] \
-      || group_id="$(get_group_id "$full_path")" \
+      || group_id="$(create_group "$group" "$group_id")" \
       || exit 1
     [[ -n "$group_id" ]] \
       || exception "Unable to get/create group $group"
