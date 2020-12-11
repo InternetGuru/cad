@@ -142,7 +142,7 @@ gitlab_api() {
     --request $req --data "${2:-{\}}" "$1")
   status="$(echo "$response" | sed -n '$p')"
   output="$(echo "$response" | sed '$d')"
-  [[ "$status" != 200 ]] \
+  [[ "$status" != 20* ]] \
     && echo "$output" >&2 \
     && exception "Invalid request $1 [$status]"
   echo "$output"
@@ -207,8 +207,7 @@ create_groups() {
       continue
     fi
     full_path="$full_path/$group"
-    group_id="$(create_group "$group" "$group_id")" \
-      || exit 1
+    group_id="$(create_group "$group" "$group_id")"
     [[ -n "$group_id" ]] \
       || group_id="$(get_group_id "$full_path")" \
       || exit 1
@@ -223,9 +222,9 @@ init_user_repo() {
   user_project_ns="$3"
   group_id="$4"
   user_project_folder="$USER_CACHE_FOLDER/$user_project_ns"
-  remote_url="https://oauth2:$TOKEN@gitlab.com/$user_project_ns.git"
-  status="$(curl --silent --write-out "%{http_code}" --output /dev/null "$remote_url")"
-  if [[ "$status" == 200 ]]; then
+  remote_url="https://oauth2:$TOKEN@gitlab.com$user_project_ns.git"
+  err="$(git ls-remote "$remote_url" 2>&1 >/dev/null)"
+  if [[ -n "$err" ]]; then
     project_id="$(create_project "$group_id" "$user")" \
       || exit 1
     [[ -z "$user_id" ]] \
@@ -411,7 +410,6 @@ fi
 authorize \
   || exception "Unable to authorize"
 TOKEN="$(cat "$ACCESS_TOKEN_FILE")"
-exit 2
 
 # process users
 msg_start "Creating / checking remote path $REMOTE_NAMESPACE"
