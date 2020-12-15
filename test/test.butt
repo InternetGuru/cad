@@ -7,53 +7,53 @@ ga="update.sh"
 #######################################
 ## Param validation
 #######################################
-correct_ns="/umiami/test/csc220"
+correct_ns="umiami/test/csc220"
 #######################################
 : $((i++))
 start "help"
   debug "$ga --help"
   assert_equal "$status" 0
   assert_startwith "${outlines[0]}" "DESCRIPTION"
-  assert_startwith "${outlines[1]}" "      update.sh creates or updates"
+  assert_startwith "${outlines[1]}" "      update.sh distributes PROJECT_FOLDER into one or more"
 end
 #######################################
 : $((i++))
 start "missing -n"
   debug "$ga -u 'user1'"
   assert_equal "$status" 2
-  assert_startwith "${errlines[0]}" "Missing or invalid REMOTE_NAMESPACE option"
+  assert_startwith "${errlines[0]}" "EXCEPTION: Missing or invalid REMOTE_NAMESPACE option, value ''"
 end
 #######################################
 : $((i++))
 start "missing -u"
   debug "$ga -n '$correct_ns'"
   assert_equal "$status" 2
-  assert_startwith "${errlines[0]}" "Missing or empty GITLAB_USERNAMES option"
+  assert_startwith "${errlines[0]}" "EXCEPTION: Missing or empty USER_LIST option"
 end
 #######################################
 : $((i++))
 start "invalid -u"
   debug "$ga -n '$correct_ns' -u 'a'"
   assert_equal "$status" 2
-  assert_startwith "${errlines[0]}" "Invalid user format, value 'a'"
+  assert_startwith "${errlines[0]}" "EXCEPTION: Invalid user format, value 'a'"
   debug "$ga -n '$correct_ns' -u 'aaaaaa
   b'"
   assert_equal "$status" 2
-  assert_startwith "${errlines[0]}" "Invalid user format, value 'b'"
+  assert_startwith "${errlines[0]}" "EXCEPTION: Invalid user format, value 'b'"
 end
 #######################################
 : $((i++))
 start "-n invalid format"
-  debug "$ga -n '/umiami' -u 'user1'"
+  debug "$ga -n 'umiami' -u 'user1'"
   assert_equal "$status" 2
-  assert_startwith "${errlines[0]}" "Missing or invalid REMOTE_NAMESPACE option"
+  assert_startwith "${errlines[0]}" "EXCEPTION: Missing or invalid REMOTE_NAMESPACE option, value 'umiami"
 end
 #######################################
 : $((i++))
 start "-u invalid format"
   debug "$ga -n '$correct_ns' -u 'user1 a'"
   assert_equal "$status" 2
-  assert_startwith "${errlines[0]}" "Invalid user format, value 'a'"
+  assert_startwith "${errlines[0]}" "EXCEPTION: Invalid user format, value 'a'"
 end
 #######################################
 : $((i++))
