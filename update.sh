@@ -14,14 +14,13 @@ msg_end() {
   echo "[ $1 ]"
 }
 confirm() {
-  #while read -r -t 0; do read -r; done
   echo -n "${1:-"Are you sure?"} [YES/No] "
-  #save_cursor_position
   clear_stdin
   read -r
-  #[[ -z "$REPLY" ]] && set_cursor_position && echo "yes"
-  [[ "$REPLY" =~ ^y(es)?$ || -z "$REPLY" ]] && return 0
-  [[ "$REPLY" =~ ^no?$ ]] && return 1
+  [[ "$REPLY" =~ ^[Yy]([Ee][Ss])?$ || -z "$REPLY" ]] \
+    && return 0
+  [[ "$REPLY" =~ ^[Nn][Oo]?$ ]] \
+    && return 1
   confirm "Type"
 }
 prompt() {
@@ -47,22 +46,11 @@ set_dev_mode() {
   exception "Invalid parameter -d value" 2
   return 2
 }
-# colorize() {
-#   local BWhite NC
-#   BWhite='\e[1;37m'
-#   NC="\e[m"
-#   sed "s/--\?[a-zA-Z]\+\|$SCRIPT_NAME\|^[A-Z].\+/\\$BWhite\0\\$NC/g"
-# }
-error() {
-  GLOBAL_MESSAGE="${1:-"$SCRIPT_NAME Error"}"
-  echo "$GLOBAL_MESSAGE" >&2
-}
 exception() {
-  error "EXCEPTION: ${1:-$SCRIPT_NAME Unknown exception}"
+  echo "EXCEPTION: ${1:-$SCRIPT_NAME Unknown exception}" >&2
   exit "${2:-1}"
 }
 format_usage() {
-  # echo -e "$1" | fmt -w "$(tput cols)" | colorize
   echo -e "$1" | fmt -w "$(tput cols)"
 }
 check_command() {
