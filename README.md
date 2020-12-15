@@ -89,6 +89,7 @@
 - [ ] Specify editable files.
 - [ ] Add GitHub support.
 - [ ] Add source project visibility check.
+- [ ] Distribute issues into newly created repositories.
 
 [1]: https://docs.gitlab.com/ee/user/group/
 [2]: https://about.gitlab.com/product/continuous-integration/
