@@ -33,7 +33,8 @@ prompt() {
   else
     read -r
   fi
-  [[ -n "$REPLY" ]] && return 0
+  [[ -n "$REPLY" ]] \
+    && return 0
   prompt "$1"
 }
 set_dev_mode() {
@@ -357,7 +358,7 @@ fi
 eval set -- "$LINE"
 
 ## load user options
-while [ $# -gt 0 ]; do
+while (( $# > 0 )); do
   case $1 in
     -d|--developer) shift; set_dev_mode "$1" || exit 2; shift ;;
     -f|--folder) shift; PROJECT_FOLDER="$1"; shift ;;
@@ -373,18 +374,15 @@ done
 
 # parameter validation
 [[ ! "$REMOTE_NAMESPACE" =~ ^[a-z0-9]{2,}(/[a-z0-9]{2,}){2,}$ ]] \
-  && error "Missing or invalid REMOTE_NAMESPACE option, value '$REMOTE_NAMESPACE'" \
-  && exit 2
+  && exception "Missing or invalid REMOTE_NAMESPACE option, value '$REMOTE_NAMESPACE'" 2
 usernames=0
 for user in $USER_LIST; do
   [[ ! "$user" =~ ^[a-z][a-z0-9_-]{4,}$ ]] \
-    && error "Invalid user format, value '$user'" \
-    && exit 2
-  : $((usernames++))
+    && exception "Invalid user format, value '$user'" 2
+  (( usernames++ ))
 done
 [[ $usernames == 0 ]] \
-  && error "Missing or empty USER_LIST option" \
-  && exit 2
+  && exception "Missing or empty USER_LIST option" 2
 
 PROJECT_FOLDER="$(readlink -f "$PROJECT_FOLDER")"
 [[ ! -d "$PROJECT_FOLDER/.git" ]] \
