@@ -285,6 +285,28 @@ update_user_repo() {
     && return
   create_request "$user_project_ns" "$main_branch" "$SOURCE_BRANCH"
 }
+get_remote_namespace() {
+  # remove hostname prefix and .git suffix from URL (expecting gitlab.com)
+  # expecting $PROJECT_FOLDER to be set
+  git -C "$PROJECT_FOLDER" config --get remote.origin.url \
+  | sed 's/^[^:]*://;s/\.git$//'
+}
+get_issues() {
+  # get issue list from source project labeled 'assignment'
+  SRC_PROJECT_ID=$(get_project_id "$SRC_REMOTE_NAMESPACE")
+  ISSUES=$(gitlab_api "$GITLAB_URL/api/v4/projects/$SRC_PROJECT_ID/issues?labels=assignment")
+  ISSUES_COUNT=$(jq length <<<"$ISSUES")
+}
+dup_issues() {
+  # duplicate issues from source project to user project
+  # expecting $ISSUES, $ISSUES_COUNT [from get_issues()], $project_id [from init_user_repo()]
+  local assignee=${1}
+  for ((i=0; i<ISSUES_COUNT; i++)); do
+    ISSUE=$(jq ".[$i] | { title,description,due_date }" <<<"$ISSUES")
+    [ -n "$assignee" ] && ISSUE=$(jq --arg a "$assignee" '. + {assignee_ids:[$a]}' <<<"$ISSUE")
+    gitlab_api "$GITLAB_URL/api/v4/projects/$project_id/issues" "$ISSUE"
+  done
+}
 
 ## default global variables
 SCRIPT_NAME="$(basename "$0")"
@@ -399,6 +421,13 @@ authorize \
   || exception "Unable to authorize"
 TOKEN="$(cat "$ACCESS_TOKEN_PATH")"
 
+# get remote namespace from git config URL (gitlab.com expected)
+msg_start "Get list of assignment issues"
+SRC_REMOTE_NAMESPACE=$(get_remote_namespace)
+# get issue list if remote namespace exists
+[ -n "$SRC_REMOTE_NAMESPACE" ] && get_issues
+msg_end "$DONE"
+
 # process users
 msg_start "Creating / checking remote path $REMOTE_NAMESPACE"
 group_id="$(get_group_id "$REMOTE_NAMESPACE")" \
@@ -421,5 +450,11 @@ for user in $USER_LIST; do
   init_user_repo "$user" "$user_id" "$group_id" \
     && update_user_repo "$user" \
     || exit 1
+  # duplicate issues, only when creating new user project
+  if [[ -n "$project_id" ]]; then
+    msg_start $'\n\t'"Duplicate assignment issues ($ISSUES_COUNT)"
+    err=$(dup_issues "$user_id" 2>&1) \
+    || printf -- '%s\n' "$err" >&2
+  fi
   msg_end "$DONE"
 done
