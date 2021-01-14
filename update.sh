@@ -7,6 +7,9 @@ set -o pipefail
 clear_stdin() {
   while read -r -t 0; do read -r; done
 }
+msg() {
+  echo -n "$1" >&2
+}
 msg_start() {
   echo -n "$1 ... " >&2
 }
@@ -443,7 +446,7 @@ for user in $USER_LIST; do
     || user_id="$(get_user_id "$user")" \
     || exit 1
   [[ $DEV_MODE == "always" && -z "$user_id" ]] \
-    && "User $user does not exist [ skipped ]" \
+    && msg "User $user does not exist [ skipped ]" \
     && continue
   # update user
   msg_start "Updating user repository for $user"
