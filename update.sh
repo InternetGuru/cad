@@ -295,16 +295,18 @@ get_issues() {
   # get issue list from source project labeled 'assignment'
   SRC_PROJECT_ID=$(get_project_id "$SRC_REMOTE_NAMESPACE")
   ISSUES=$(gitlab_api "$GITLAB_URL/api/v4/projects/$SRC_PROJECT_ID/issues?labels=assignment")
-  ISSUES_COUNT=$(jq length <<<"$ISSUES")
+  ISSUES_COUNT=$(jq length <<< "$ISSUES")
 }
 dup_issues() {
   # duplicate issues from source project to user project
   # expecting $ISSUES, $ISSUES_COUNT [from get_issues()], $project_id [from init_user_repo()]
-  local assignee=${1}
-  for ((i=0; i<ISSUES_COUNT; i++)); do
-    ISSUE=$(jq ".[$i] | { title,description,due_date }" <<<"$ISSUES")
-    [ -n "$assignee" ] && ISSUE=$(jq --arg a "$assignee" '. + {assignee_ids:[$a]}' <<<"$ISSUE")
-    gitlab_api "$GITLAB_URL/api/v4/projects/$project_id/issues" "$ISSUE"
+  local assignee=$1
+  for (( i=0; i < ISSUES_COUNT; i++ )); do
+    issue=$(jq ".[$i] | { title,description,due_date }" <<< "$ISSUES")
+    [[ -n "$assignee" ]] \
+      && issue=$(jq --arg a "$assignee" '. + {assignee_ids:[$a]}' <<< "$issue")
+    gitlab_api "$GITLAB_URL/api/v4/projects/$project_id/issues" "$issue" \
+      || exit 1
   done
 }
 
@@ -449,11 +451,12 @@ for user in $USER_LIST; do
   init_user_repo "$user" "$user_id" "$group_id" \
     && update_user_repo "$user" \
     || exit 1
+  msg_end "$DONE"
   # duplicate issues, only when creating new user project
   if [[ -n "$project_id" ]]; then
-    msg_start $'\n\t'"Duplicate assignment issues ($ISSUES_COUNT)"
-    err=$(dup_issues "$user_id" 2>&1) \
-    || printf -- '%s\n' "$err" >&2
+    msg_start "Duplicate assignment issues ($ISSUES_COUNT)"
+    dup_issues "$user_id" \
+      || exit 1
+    msg_end "$DONE"
   fi
-  msg_end "$DONE"
 done
