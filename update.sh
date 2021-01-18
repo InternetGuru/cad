@@ -222,6 +222,7 @@ init_user_repo() {
 
   if [[ -n "$err" ]]; then
     project_id="$(create_project "$group_id" "$user")" \
+      && dup_issues "$user_id" \
       || exit 1
     [[ -z "$user_id" ]] \
       || add_developer "$project_id" "$user_id" \
@@ -292,16 +293,24 @@ get_remote_namespace() {
   | sed 's/^[^:]*://;s/\.git$//'
 }
 get_issues() {
-  # get issue list from source project labeled 'assignment'
-  SRC_PROJECT_ID=$(get_project_id "$SRC_REMOTE_NAMESPACE")
-  ISSUES=$(gitlab_api "$GITLAB_URL/api/v4/projects/$SRC_PROJECT_ID/issues?labels=assignment")
-  ISSUES_COUNT=$(jq length <<< "$ISSUES")
+  [[ "$ISSUES" != "null" ]] \
+    && return
+  src_remote_namespace=$(get_remote_namespace)
+  [[ -z "$src_remote_namespace" ]] \
+    && ISSUES= \
+    && return
+  msg_start "Get list of assignment issues"
+  src_project_id=$(get_project_id "$src_remote_namespace") \
+    && ISSUES=$(gitlab_api "$GITLAB_URL/api/v4/projects/$src_project_id/issues?labels=assignment") \
+    || exit 1
+  msg_end "$DONE"
 }
 dup_issues() {
   # duplicate issues from source project to user project
-  # expecting $ISSUES, $ISSUES_COUNT [from get_issues()], $project_id [from init_user_repo()]
   local assignee=$1
-  for (( i=0; i < ISSUES_COUNT; i++ )); do
+  get_issues
+  issues_count=$(jq length <<< "$ISSUES")
+  for (( i=0; i < issues_count; i++ )); do
     issue=$(jq ".[$i] | { title,description,due_date }" <<< "$ISSUES")
     [[ -n "$assignee" ]] \
       && issue=$(jq --arg a "$assignee" '. + {assignee_ids:[$a]}' <<< "$issue")
@@ -325,6 +334,7 @@ ACCESS_TOKEN_PATH="$HOME/$ACCESS_TOKEN_FILE"
 DONE=" done "
 SOURCE_BRANCH="source"
 PROJECT_BRANCH=""
+ISSUES=null
 
 ## usage
 USAGE="$(format_usage "DESCRIPTION
@@ -423,13 +433,6 @@ authorize \
   || exception "Unable to authorize"
 TOKEN="$(cat "$ACCESS_TOKEN_PATH")"
 
-# get remote namespace from git config URL (gitlab.com expected)
-msg_start "Get list of assignment issues"
-SRC_REMOTE_NAMESPACE=$(get_remote_namespace)
-# get issue list if remote namespace exists
-[ -n "$SRC_REMOTE_NAMESPACE" ] && get_issues
-msg_end "$DONE"
-
 # process users
 msg_start "Creating / checking remote path $REMOTE_NAMESPACE"
 group_id="$(get_group_id "$REMOTE_NAMESPACE")" \
@@ -445,18 +448,11 @@ for user in $USER_LIST; do
     || user_id="$(get_user_id "$user")" \
     || exit 1
   [[ $DEV_MODE == "always" && -z "$user_id" ]] \
-    && exception "User $user does not exist [ skipped ]"
+    && exception "User $user does not exist"
   # update user
   msg_start "Updating user repository for $user"
   init_user_repo "$user" "$user_id" "$group_id" \
     && update_user_repo "$user" \
     || exit 1
   msg_end "$DONE"
-  # duplicate issues, only when creating new user project
-  if [[ -n "$project_id" ]]; then
-    msg_start "Duplicate assignment issues ($ISSUES_COUNT)"
-    dup_issues "$user_id" \
-      || exit 1
-    msg_end "$DONE"
-  fi
 done
