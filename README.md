@@ -16,7 +16,7 @@
 
 ## Installation
 
-- To install locally, simply clone this project into your (e.g. home) folder and set an alias.
+- To install locally, simply clone this project and set an alias.
 
    ```
    git clone https://github.com/InternetGuru/cad.git
