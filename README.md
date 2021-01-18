@@ -4,7 +4,7 @@
 
 # Coding Assignment Distribution | CAD
 
-> The `update.sh` script distributes a GitLab assignment repository _detaching its history_ into multiple solver repositories. For future updates it creates a separate `source` branch and creates pull requests into main branch whenever updated. For each solver, the script sets developer rights in newly created repository if solver's user account exists. This project also provides GitLab CI template (see below).
+> The `update.sh` script distributes a GitLab assignment repository _detaching its history_ into multiple solver repositories. For future updates it creates a separate `source` branch and creates pull requests into main branch whenever updated. For newly created repositories the script duplicates issues with `assignment` label and sets assignee and developer rights for existing users. This project also provides GitLab CI template (see below).
 
 ## Requirements
 
