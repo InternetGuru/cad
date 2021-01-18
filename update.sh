@@ -410,12 +410,11 @@ msg_end "$DONE"
 for user in $USER_LIST; do
   # check user
   user_id=""
-  [[ $DEV_MODE == "none" ]] \
+  [[ $DEV_MODE == "never" ]] \
     || user_id="$(get_user_id "$user")" \
     || exit 1
   [[ $DEV_MODE == "always" && -z "$user_id" ]] \
-    && "User $user does not exist [ skipped ]" \
-    && continue
+    && exception "User $user does not exist"
   # update user
   msg_start "Updating user repository for $user"
   init_user_repo "$user" "$user_id" "$group_id" \
