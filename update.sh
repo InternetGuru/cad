@@ -8,13 +8,13 @@ clear_stdin() {
   while read -r -t 0; do read -r; done
 }
 msg_start() {
-  echo -n "$1 ... "
+  echo -n "$1 ... " >&2
 }
 msg_end() {
-  echo "[ $1 ]"
+  echo "[ $1 ]" >&2
 }
 confirm() {
-  echo -n "${1:-"Are you sure?"} [YES/No] "
+  echo -n "${1:-"Are you sure?"} [YES/No] " >&2
   clear_stdin
   read -r
   [[ "$REPLY" =~ ^[Yy]([Ee][Ss])?$ || -z "$REPLY" ]] \

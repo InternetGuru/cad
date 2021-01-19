@@ -60,8 +60,7 @@ end
 start "-f invalid path"
   debug "$ga -n '$correct_ns' -u 'user1' -f '/foo'"
   assert_equal "$status" 1
-  assert_startwith "${errlines[0]}" "EXCEPTION: /foo is not a directory"
-  assert_equal "${#outlines[@]}" 2
+  assert_startwith "${errlines[1]}" "Checking paths ... EXCEPTION: /foo is not a directory"
 end
 #######################################
 ## Requirements
