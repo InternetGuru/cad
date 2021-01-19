@@ -16,11 +16,11 @@
 
 ## Installation
 
-- To install locally, simply clone this project into your home folder and set an alias.
+- To install locally, simply clone this project and set an alias.
 
    ```
-   git clone https://github.com/InternetGuru/cad.git ~
-   echo alias cad=\"\$HOME/cad/update.sh\" >> ~/.bashrc
+   git clone https://github.com/InternetGuru/cad.git
+   echo alias cad=\"$PWD/cad/update.sh\" >> ~/.bashrc
    source ~/.bashrc
    ```
 
