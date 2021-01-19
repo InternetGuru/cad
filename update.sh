@@ -222,6 +222,7 @@ init_user_repo() {
 
   if [[ -n "$err" ]]; then
     project_id="$(create_project "$group_id" "$user")" \
+      && dup_issues "$user_id" \
       || exit 1
     [[ -z "$user_id" ]] \
       || add_developer "$project_id" "$user_id" \
@@ -285,6 +286,38 @@ update_user_repo() {
     && return
   create_request "$user_project_ns" "$main_branch" "$SOURCE_BRANCH"
 }
+get_remote_namespace() {
+  # remove hostname prefix and .git suffix from URL (expecting gitlab.com)
+  # expecting $PROJECT_FOLDER to be set
+  git -C "$PROJECT_FOLDER" config --get remote.origin.url \
+  | sed 's/^[^:]*://;s/\.git$//'
+}
+get_issues() {
+  [[ "$ISSUES" != "null" ]] \
+    && return
+  src_remote_namespace=$(get_remote_namespace)
+  [[ -z "$src_remote_namespace" ]] \
+    && ISSUES= \
+    && return
+  msg_start "Get list of assignment issues"
+  src_project_id=$(get_project_id "$src_remote_namespace") \
+    && ISSUES=$(gitlab_api "$GITLAB_URL/api/v4/projects/$src_project_id/issues?labels=assignment") \
+    || exit 1
+  msg_end "$DONE"
+}
+dup_issues() {
+  # duplicate issues from source project to user project
+  local assignee=$1
+  get_issues
+  issues_count=$(jq length <<< "$ISSUES")
+  for (( i=0; i < issues_count; i++ )); do
+    issue=$(jq ".[$i] | { title,description,due_date }" <<< "$ISSUES")
+    [[ -n "$assignee" ]] \
+      && issue=$(jq --arg a "$assignee" '. + {assignee_ids:[$a]}' <<< "$issue")
+    gitlab_api "$GITLAB_URL/api/v4/projects/$project_id/issues" "$issue" \
+      || exit 1
+  done
+}
 
 ## default global variables
 SCRIPT_NAME="$(basename "$0")"
@@ -301,6 +334,7 @@ ACCESS_TOKEN_PATH="$HOME/$ACCESS_TOKEN_FILE"
 DONE=" done "
 SOURCE_BRANCH="source"
 PROJECT_BRANCH=""
+ISSUES=null
 
 ## usage
 USAGE="$(format_usage "DESCRIPTION
