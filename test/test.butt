@@ -2,7 +2,7 @@
 
 i=0
 status=""
-ga="/home/pablo/clients/umiami/cad/update.sh"
+ga="update.sh"
 
 #######################################
 ## Param validation
