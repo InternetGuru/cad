@@ -8,9 +8,15 @@ clear_stdin() {
   while read -r -t 0; do read -r; done
 }
 msg_start() {
+  [[ $MSG_STATUS == 1 ]] \
+    && exception "Message already started"
+  MSG_STATUS=1
   echo -n "$1 ... " >&2
 }
 msg_end() {
+  [[ $MSG_STATUS == 0 ]] \
+    && exception "Message not started"
+  MSG_STATUS=0
   echo "[ $1 ]" >&2
 }
 confirm() {
@@ -335,6 +341,7 @@ DONE=" done "
 SOURCE_BRANCH="source"
 PROJECT_BRANCH=""
 ISSUES=null
+MSG_STATUS=0
 
 ## usage
 USAGE="$(format_usage "DESCRIPTION
