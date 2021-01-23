@@ -175,11 +175,16 @@ create_request() {
     \"remove_source_branch\": \"false\", \"title\": \"Update from $SOURCE_BRANCH branch\"}" >/dev/null
 }
 create_project() {
+  visibility=public
+  [[ -n "$3" ]] \
+    && visibility=private
   gitlab_api "$GITLAB_URL/api/v4/projects" \
-    "{\"namespace_id\":\"$1\", \"name\":\"$2\", \"visibility\":\"private\"}" \
+    "{\"namespace_id\":\"$1\", \"name\":\"$2\", \"visibility\":\"$visibility\"}" \
     | jq -r '.id'
 }
 add_developer() {
+  [[ -z "$2" ]] \
+    && return
   gitlab_api "$GITLAB_URL/api/v4/projects/$1/members" \
     "{\"access_level\":\"30\", \"user_id\":\"$2\"}" >/dev/null
 }
@@ -227,11 +232,9 @@ init_user_repo() {
   err="$(git ls-remote "$remote_url" 2>&1 >/dev/null)"
 
   if [[ -n "$err" ]]; then
-    project_id="$(create_project "$group_id" "$user")" \
+    project_id="$(create_project "$group_id" "$user" "$user_id")" \
+      && add_developer "$project_id" "$user_id" \
       && dup_issues "$user_id" \
-      || exit 1
-    [[ -z "$user_id" ]] \
-      || add_developer "$project_id" "$user_id" \
       || exit 1
     rm -rf "$user_project_folder"
   fi
@@ -311,13 +314,12 @@ get_issues() {
 }
 dup_issues() {
   # duplicate issues from source project to user project
-  local assignee=$1
   get_issues
   issues_count=$(jq length <<< "$ISSUES")
   for (( i=0; i < issues_count; i++ )); do
     issue=$(jq ".[$i] | { title,description,due_date }" <<< "$ISSUES")
-    [[ -n "$assignee" ]] \
-      && issue=$(jq --arg a "$assignee" '. + {assignee_ids:[$a]}' <<< "$issue")
+    [[ -n "$1" ]] \
+      && issue=$(jq --arg a "$1" '. + {assignee_ids:[$a]}' <<< "$issue")
     gitlab_api "$GITLAB_URL/api/v4/projects/$project_id/issues" "$issue" \
       || exit 1
   done
