@@ -240,7 +240,7 @@ init_user_repo() {
       && exception "User $user does not exist"
     project_id="$(create_project "$group_id" "$user" "$user_id")" \
       && add_developer "$project_id" "$user_id" \
-      && dup_issues "$user_id" \
+      && copy_issues "$user_id" \
       || exit 1
     rm -rf "$user_project_folder"
   fi
@@ -302,15 +302,13 @@ update_user_repo() {
   create_request "$user_project_ns" "$main_branch" "$SOURCE_BRANCH"
 }
 get_remote_namespace() {
-  # remove hostname prefix and .git suffix from URL (expecting gitlab.com)
-  # expecting $PROJECT_FOLDER to be set
-  git -C "$PROJECT_FOLDER" config --get remote.origin.url \
-  | sed 's/^[^:]*://;s/\.git$//'
+  # read repostiroy URL and trim hostname prefix and .git suffix
+  git -C "$PROJECT_FOLDER" config --get remote.origin.url | sed 's/^[^:]*://;s/\.git$//' \
+    || exception "Unable to acquire remote namespace"
 }
-get_issues() {
-  (( "$ISSUES_COUNT" >= 0 )) \
-    && return
-  src_remote_namespace=$(get_remote_namespace)
+read_issues() {
+  src_remote_namespace=$(get_remote_namespace) \
+    || exit 1
   [[ -z "$src_remote_namespace" ]] \
     && ISSUES_COUNT=0 \
     && return
@@ -319,9 +317,9 @@ get_issues() {
     && ISSUES_COUNT=$(jq length <<< "$ISSUES") \
     || exit 1
 }
-dup_issues() {
-  # duplicate issues from source project to user project
-  get_issues
+copy_issues() {
+  (( "$ISSUES_COUNT" < 0 )) \
+    && read_issues
   for (( i=0; i < ISSUES_COUNT; i++ )); do
     issue=$(jq ".[$i] | { title,description,due_date }" <<< "$ISSUES")
     [[ -n "$1" ]] \
