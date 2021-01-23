@@ -189,7 +189,8 @@ add_developer() {
     "{\"access_level\":\"30\", \"user_id\":\"$2\"}" >/dev/null
 }
 create_group() {
-  gitlab_api "$GITLAB_URL/api/v4/groups?name=$1&path=$1&parent_id=$2" "{}" \
+  gitlab_api "$GITLAB_URL/api/v4/groups" \
+    "{\"name\":\"$1\", \"path\":\"$1\", \"parent_id\"=\"$2\", \"visibility\":\"public\"}" \
     | jq -r '.id'
 }
 get_user_id() {
