@@ -349,14 +349,7 @@ ISSUES_COUNT=-1
 MSG_STATUS=0
 
 ## usage
-USAGE="$(format_usage "DESCRIPTION
-      $SCRIPT_NAME distributes PROJECT_FOLDER into one or more repositories. The remote repository path for each USER from USER_LIST is REMOTE_NAMESPACE/USER.
-
-      The script uses ~/$CACHE_FOLDER folder to cache repositories and access token at ~/$ACCESS_TOKEN_FILE to authorize. Prompts credentials if access token is not found.
-
-      All created repositories are owned by the authenticated user and their visibility is set to private. Each repository has appropriate user assigned with developer rights if USER is an existing GitLab username.
-
-USAGE
+USAGE="$(format_usage "USAGE
       $SCRIPT_NAME -n REMOTE_NAMESPACE -u USER_LIST [-rh] [-f PROJECT_FOLDER]
 
 OPTIONS
