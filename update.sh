@@ -305,11 +305,9 @@ get_issues() {
   [[ -z "$src_remote_namespace" ]] \
     && ISSUES= \
     && return
-  msg_start "Get list of assignment issues"
   src_project_id=$(get_project_id "$src_remote_namespace") \
     && ISSUES=$(gitlab_api "$GITLAB_URL/api/v4/projects/$src_project_id/issues?labels=assignment") \
     || exit 1
-  msg_end "$DONE"
 }
 dup_issues() {
   # duplicate issues from source project to user project
