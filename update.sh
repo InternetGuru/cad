@@ -225,14 +225,19 @@ create_namespace() {
 }
 init_user_repo() {
   user="$1"
-  user_id="$2"
-  group_id="$3"
+  group_id="$2"
   user_project_ns="$REMOTE_NAMESPACE/$user"
   user_project_folder="$USER_CACHE_FOLDER/$user_project_ns"
   remote_url="https://oauth2:$TOKEN@gitlab.com/$user_project_ns.git"
   err="$(git ls-remote "$remote_url" 2>&1 >/dev/null)"
 
   if [[ -n "$err" ]]; then
+    user_id=""
+    [[ $DEV_MODE == "never" ]] \
+      || user_id="$(get_user_id "$user")" \
+      || exit 1
+    [[ $DEV_MODE == "always" && -z "$user_id" ]] \
+      && exception "User $user does not exist"
     project_id="$(create_project "$group_id" "$user" "$user_id")" \
       && add_developer "$project_id" "$user_id" \
       && dup_issues "$user_id" \
@@ -450,16 +455,8 @@ group_id="$(get_group_id "$REMOTE_NAMESPACE")" \
   || exit 1
 msg_end "$DONE"
 for user in $USER_LIST; do
-  # check user
-  user_id=""
-  [[ $DEV_MODE == "never" ]] \
-    || user_id="$(get_user_id "$user")" \
-    || exit 1
-  [[ $DEV_MODE == "always" && -z "$user_id" ]] \
-    && exception "User $user does not exist"
-  # update user
   msg_start "Updating user repository for $user"
-  init_user_repo "$user" "$user_id" "$group_id" \
+  init_user_repo "$user" "$group_id" \
     && update_user_repo "$user" \
     || exit 1
   msg_end "$DONE"
