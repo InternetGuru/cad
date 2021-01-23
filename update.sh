@@ -138,7 +138,7 @@ gitlab_api() {
   response=$(curl --silent --write-out "\n%{http_code}\n" \
     --header "Authorization: Bearer $TOKEN" \
     --header "Content-Type: application/json" \
-    --request $req --data "${2:-{\}}" "$1")
+    --request $req --data "${2:-{\}}" "$GITLAB_URL/$1")
   status="$(echo "$response" | sed -n '$p')"
   output="$(echo "$response" | sed '$d')"
   [[ "$status" != 20* ]] \
@@ -154,23 +154,23 @@ authorize() {
   prompt "Password" silent
   password="$REPLY"
   echo
-  gitlab_api "$GITLAB_URL/oauth/token" \
+  gitlab_api "oauth/token" \
     "{\"grant_type\":\"password\",\"username\":\"$username\",\"password\":\"$password\"}" \
     | jq -r '.access_token' > "$ACCESS_TOKEN_PATH"
 }
 get_project_id() {
-  gitlab_api "$GITLAB_URL/api/v4/projects?search=$(basename "$1")" \
+  gitlab_api "api/v4/projects?search=$(basename "$1")" \
     | jq -r --arg ns "$1" '.[] | select(.path_with_namespace==$ns) | .id'
 }
 get_group_id() {
-  gitlab_api "$GITLAB_URL/api/v4/groups?search=$1" \
+  gitlab_api "api/v4/groups?search=$1" \
     | jq -r --arg full_path "$1" '.[] | select(.full_path==$full_path) | .id'
 }
 create_request() {
   project_id="$(get_project_id "$1")" \
     || [[ -n "$project_id" ]] \
     || exit 1
-  gitlab_api "$GITLAB_URL/api/v4/projects/$project_id/merge_requests" \
+  gitlab_api "api/v4/projects/$project_id/merge_requests" \
     "{\"id\":\"$project_id\", \"source_branch\":\"$SOURCE_BRANCH\", \"target_branch\":\"master\", \
     \"remove_source_branch\": \"false\", \"title\": \"Update from $SOURCE_BRANCH branch\"}" >/dev/null
 }
@@ -178,23 +178,23 @@ create_project() {
   visibility=public
   [[ -n "$3" ]] \
     && visibility=private
-  gitlab_api "$GITLAB_URL/api/v4/projects" \
+  gitlab_api "api/v4/projects" \
     "{\"namespace_id\":\"$1\", \"name\":\"$2\", \"visibility\":\"$visibility\"}" \
     | jq -r '.id'
 }
 add_developer() {
   [[ -z "$2" ]] \
     && return
-  gitlab_api "$GITLAB_URL/api/v4/projects/$1/members" \
+  gitlab_api "api/v4/projects/$1/members" \
     "{\"access_level\":\"30\", \"user_id\":\"$2\"}" >/dev/null
 }
 create_group() {
-  gitlab_api "$GITLAB_URL/api/v4/groups" \
+  gitlab_api "api/v4/groups" \
     "{\"name\":\"$1\", \"path\":\"$1\", \"parent_id\":\"$2\", \"visibility\":\"public\"}" \
     | jq -r '.id'
 }
 get_user_id() {
-  gitlab_api "$GITLAB_URL/api/v4/users?username=$1" \
+  gitlab_api "api/v4/users?username=$1" \
     | jq -r '.[] | .id' | sed 's/null//'
 }
 create_namespace() {
@@ -315,7 +315,7 @@ get_issues() {
     && ISSUES_COUNT=0 \
     && return
   src_project_id=$(get_project_id "$src_remote_namespace") \
-    && ISSUES=$(gitlab_api "$GITLAB_URL/api/v4/projects/$src_project_id/issues?labels=assignment") \
+    && ISSUES=$(gitlab_api "api/v4/projects/$src_project_id/issues?labels=assignment") \
     && ISSUES_COUNT=$(jq length <<< "$ISSUES") \
     || exit 1
 }
@@ -326,7 +326,7 @@ dup_issues() {
     issue=$(jq ".[$i] | { title,description,due_date }" <<< "$ISSUES")
     [[ -n "$1" ]] \
       && issue=$(jq --arg a "$1" '. + {assignee_ids:[$a]}' <<< "$issue")
-    gitlab_api "$GITLAB_URL/api/v4/projects/$project_id/issues" "$issue" \
+    gitlab_api "api/v4/projects/$project_id/issues" "$issue" \
       || exit 1
   done
 }
