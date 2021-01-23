@@ -303,21 +303,21 @@ get_remote_namespace() {
   | sed 's/^[^:]*://;s/\.git$//'
 }
 get_issues() {
-  [[ "$ISSUES" != "null" ]] \
+  (( "$ISSUES_COUNT" >= 0 )) \
     && return
   src_remote_namespace=$(get_remote_namespace)
   [[ -z "$src_remote_namespace" ]] \
-    && ISSUES= \
+    && ISSUES_COUNT=0 \
     && return
   src_project_id=$(get_project_id "$src_remote_namespace") \
     && ISSUES=$(gitlab_api "$GITLAB_URL/api/v4/projects/$src_project_id/issues?labels=assignment") \
+    && ISSUES_COUNT=$(jq length <<< "$ISSUES") \
     || exit 1
 }
 dup_issues() {
   # duplicate issues from source project to user project
   get_issues
-  issues_count=$(jq length <<< "$ISSUES")
-  for (( i=0; i < issues_count; i++ )); do
+  for (( i=0; i < ISSUES_COUNT; i++ )); do
     issue=$(jq ".[$i] | { title,description,due_date }" <<< "$ISSUES")
     [[ -n "$1" ]] \
       && issue=$(jq --arg a "$1" '. + {assignee_ids:[$a]}' <<< "$issue")
@@ -341,7 +341,7 @@ ACCESS_TOKEN_PATH="$HOME/$ACCESS_TOKEN_FILE"
 DONE=" done "
 SOURCE_BRANCH="source"
 PROJECT_BRANCH=""
-ISSUES=null
+ISSUES_COUNT=-1
 MSG_STATUS=0
 
 ## usage
