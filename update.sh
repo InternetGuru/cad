@@ -132,9 +132,9 @@ git_fetch_all() {
     || exception "$out"
 }
 gitlab_api() {
-  req=GET
+  req="GET"
   [[ -n "$2" ]] \
-    && req=POST
+    && req="POST"
   response=$(curl --silent --write-out "\n%{http_code}\n" \
     --header "Authorization: Bearer $TOKEN" \
     --header "Content-Type: application/json" \
@@ -175,9 +175,9 @@ create_request() {
     \"remove_source_branch\": \"false\", \"title\": \"Update from $SOURCE_BRANCH branch\"}" >/dev/null
 }
 create_project() {
-  visibility=public
+  visibility="public"
   [[ -n "$3" ]] \
-    && visibility=private
+    && visibility="private"
   gitlab_api "api/v4/projects" \
     "{\"namespace_id\":\"$1\", \"name\":\"$2\", \"visibility\":\"$visibility\"}" \
     | jq -r '.id'
@@ -346,6 +346,7 @@ ACCESS_TOKEN_PATH="$HOME/$ACCESS_TOKEN_FILE"
 DONE=" done "
 SOURCE_BRANCH="source"
 PROJECT_BRANCH=""
+ISSUES=""
 ISSUES_COUNT=-1
 MSG_STATUS=0
 
