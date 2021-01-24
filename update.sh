@@ -196,7 +196,7 @@ create_ns() {
   [[ "$parent_ns" == . ]] \
     && exception "Root group $1 does not exist"
   parent_id=$(get_group_id "$parent_ns" 2>/dev/null) \
-    || create_ns "$parent_ns" \
+    || parent_id=$(create_ns "$parent_ns") \
     || exit 1
   create_group "$(basename "$1")" "$parent_id"
 }
