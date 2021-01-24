@@ -71,7 +71,7 @@ git_local_branch_exists() {
 git_current_branch() {
   local out
   # shellcheck disable=SC2086
-  out="$(git -C "${1:-.}" rev-parse --abbrev-ref HEAD)" \
+  out=$(git -C "${1:-.}" rev-parse --abbrev-ref HEAD) \
     || exception "$out"
   echo "$out"
 }
@@ -81,19 +81,19 @@ git_same_commit() {
 git_init() {
   local out
   # shellcheck disable=SC2086
-  out="$(git -C "${1:-.}" init 2>&1)" \
+  out=$(git -C "${1:-.}" init 2>&1) \
     || exception "$out"
 }
 git_add_all() {
   local out
   # shellcheck disable=SC2086
-  out="$(git -C "${1:-.}" add -A 2>&1)" \
+  out=$(git -C "${1:-.}" add -A 2>&1) \
     || exception "$out"
 }
 git_checkout() {
   local out
   # shellcheck disable=SC2086
-  out="$(git -C "${2:-.}" checkout $1 2>&1)" \
+  out=$(git -C "${2:-.}" checkout $1 2>&1) \
     || exception "$out"
 }
 git_status_empty() {
@@ -105,30 +105,30 @@ git_remote_exists() {
 git_pull() {
   local out
   # shellcheck disable=SC2086
-  out="$(git -C "${1:-.}" pull $2 2>&1)" \
+  out=$(git -C "${1:-.}" pull $2 2>&1) \
     || exception "$out"
 }
 git_merge() {
   local out
   # shellcheck disable=SC2086
-  out="$(git -C "${2:-.}" merge $1 2>&1)" \
+  out=$(git -C "${2:-.}" merge $1 2>&1) \
     || exception "$out"
 }
 git_push() {
   local out
   # shellcheck disable=SC2086
-  out="$(git -C "${2:-.}" push $1 2>&1)" \
+  out=$(git -C "${2:-.}" push $1 2>&1) \
     || exception "$out"
 }
 git_commit() {
   local out
   # shellcheck disable=SC2086
-  out="$(git -C "${2:-.}" commit $3 -m "$1" 2>&1)" \
+  out=$(git -C "${2:-.}" commit $3 -m "$1" 2>&1) \
     || exception "$out"
 }
 git_fetch_all() {
   local out
-  out="$(git -C "${1:-.}" fetch --all 2>&1)" \
+  out=$(git -C "${1:-.}" fetch --all 2>&1) \
     || exception "$out"
 }
 gitlab_api() {
@@ -139,8 +139,8 @@ gitlab_api() {
     --header "Authorization: Bearer $TOKEN" \
     --header "Content-Type: application/json" \
     --request $req --data "${2:-{\}}" "https://$GITLAB_URL/$1")
-  status="$(echo "$response" | sed -n '$p')"
-  output="$(echo "$response" | sed '$d')"
+  status=$(echo "$response" | sed -n '$p')
+  output=$(echo "$response" | sed '$d')
   [[ "$status" != 20* ]] \
     && echo "$output" >&2 \
     && exception "Invalid request $1 [$status]"
@@ -166,7 +166,7 @@ get_group_id() {
     | jq -r --arg full_path "$1" '.[] | select(.full_path==$full_path) | .id'
 }
 create_request() {
-  project_id="$(get_project_id "$1")" \
+  project_id=$(get_project_id "$1") \
     || exit 1
   gitlab_api "api/v4/projects/$project_id/merge_requests" \
     "{\"id\":\"$project_id\", \"source_branch\":\"$SOURCE_BRANCH\", \"target_branch\":\"master\", \
@@ -203,17 +203,17 @@ create_namespace() {
     # root group must exist
     if [[ -z "$group_id" ]]; then
       full_path="$group"
-      group_id="$(get_group_id "$full_path")" \
+      group_id=$(get_group_id "$full_path") \
         || exit 1
       [[ -z "$group_id" ]] \
         && exception "Root group $group does not exist"
       continue
     fi
     full_path="$full_path/$group"
-    tmp_group_id="$(get_group_id "$full_path")" \
+    tmp_group_id=$(get_group_id "$full_path") \
       || exit 1
     [[ -n "$tmp_group_id" ]] \
-      || tmp_group_id="$(create_group "$group" "$group_id")" \
+      || tmp_group_id=$(create_group "$group" "$group_id") \
       || exit 1
     [[ -n "$tmp_group_id" ]] \
       || exception "Unable to get/create group $group"
@@ -227,16 +227,16 @@ init_user_repo() {
   project_ns="$REMOTE_NS/$user"
   project_folder="$CACHE_FOLDER/$project_ns"
   remote_url="https://oauth2:$TOKEN@gitlab.com/$project_ns.git"
-  err="$(git ls-remote "$remote_url" 2>&1 >/dev/null)"
+  err=$(git ls-remote "$remote_url" 2>&1 >/dev/null)
 
   if [[ -n "$err" ]]; then
     user_id=""
     [[ $SET_DEVEL == "never" ]] \
-      || user_id="$(get_user_id "$user")" \
+      || user_id=$(get_user_id "$user") \
       || exit 1
     [[ $SET_DEVEL == "always" && -z "$user_id" ]] \
       && exception "User $user does not exist"
-    project_id="$(create_project "$group_id" "$user" "$user_id")" \
+    project_id=$(create_project "$group_id" "$user" "$user_id") \
       && add_developer "$project_id" "$user_id" \
       && copy_issues "$project_id" "$user_id" \
       || exit 1
@@ -281,7 +281,7 @@ update_user_repo() {
   # update from assignment
   rsync -a --delete --exclude .git/ "$PROJECT_FOLDER/" "$project_folder"
   # replace remote in README.md
-  main_branch="$(git -C "$project_folder" remote show origin | grep "HEAD branch:" | tr -d " " | cut -d: -f2)"
+  main_branch=$(git -C "$project_folder" remote show origin | grep "HEAD branch:" | tr -d " " | cut -d: -f2)
   [[ $REPLACE_README == 1 ]] \
     && replace_readme "$project_ns" "$project_folder" "$main_branch"
   git_status_empty "$project_folder" \
@@ -322,7 +322,7 @@ copy_issues() {
 }
 
 ## default global variables
-SCRIPT_NAME="$(basename "$0")"
+SCRIPT_NAME=$(basename "$0")
 REMOTE_NS=""
 PROJECT_FOLDER="." # current folder
 USER_LIST=""
@@ -342,7 +342,7 @@ ISSUES_COUNT=-1
 MSG_STATUS=0
 
 ## usage
-USAGE="$(format_usage "USAGE
+USAGE=$(format_usage "USAGE
       $SCRIPT_NAME -n REMOTE_NAMESPACE -u USER_LIST [-rh] [-f PROJECT_FOLDER]
 
 OPTIONS
@@ -363,7 +363,7 @@ OPTIONS
 
       -u, --usernames=USER_LIST
               List of one or more solvers separated by space or newline, e.g. 'user1 user2'.
-")"
+")
 
 ## option preprocessing
 if ! LINE=$(
@@ -424,22 +424,22 @@ msg_end "$DONE"
 
 authorize \
   || exception "Unable to authorize"
-TOKEN="$(cat "$TOKEN_PATH")"
+TOKEN=$(cat "$TOKEN_PATH")
 
-PROJECT_FOLDER="$(readlink -f "$PROJECT_FOLDER")"
+PROJECT_FOLDER=$(readlink -f "$PROJECT_FOLDER")
 if [[ -d "$PROJECT_FOLDER/.git" ]]; then
   PROJECT_NS=$(get_remote_namespace "$PROJECT_FOLDER") \
     && PROJECT_ID=$(get_project_id "$PROJECT_NS") \
-    && PROJECT_BRANCH="$(git_current_branch "$PROJECT_FOLDER")" \
+    && PROJECT_BRANCH=$(git_current_branch "$PROJECT_FOLDER") \
     || exit 1
 fi
 
 # process users
 msg_start "Creating / checking remote path $REMOTE_NS"
-group_id="$(get_group_id "$REMOTE_NS")" \
+group_id=$(get_group_id "$REMOTE_NS") \
   || exit 1
 [[ -n "$group_id" ]] \
-  || group_id="$(create_namespace "$REMOTE_NS")" \
+  || group_id=$(create_namespace "$REMOTE_NS") \
   || exit 1
 msg_end "$DONE"
 for user in $USER_LIST; do
