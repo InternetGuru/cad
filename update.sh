@@ -17,7 +17,7 @@ msg_end() {
   [[ $MSG_STATUS == 0 ]] \
     && exception "Message not started"
   MSG_STATUS=0
-  echo "[ $1 ]" >&2
+  echo "[ done ]" >&2
 }
 confirm() {
   echo -n "${1:-"Are you sure?"} [YES/No] " >&2
@@ -70,7 +70,6 @@ git_local_branch_exists() {
 }
 git_current_branch() {
   local out
-  # shellcheck disable=SC2086
   out=$(git -C "${1:-.}" rev-parse --abbrev-ref HEAD) \
     || exception "$out"
   echo "$out"
@@ -80,13 +79,11 @@ git_same_commit() {
 }
 git_init() {
   local out
-  # shellcheck disable=SC2086
   out=$(git -C "${1:-.}" init 2>&1) \
     || exception "$out"
 }
 git_add_all() {
   local out
-  # shellcheck disable=SC2086
   out=$(git -C "${1:-.}" add -A 2>&1) \
     || exception "$out"
 }
@@ -251,20 +248,20 @@ replace_readme() {
   project_ns="$1"
   project_folder="$2"
   main_branch="$3"
-  sed -i "s~/$PROJECT_NS/~/$project_ns/~g" "$project_folder/README.md"
+  sed -i "s~/$PROJECT_NS/~/$project_ns/~g" "$project_folder/$README_FILE"
   [[ -z "$PROJECT_BRANCH" ]] \
     && return
-  sed -i "s~/$PROJECT_BRANCH/\(pipeline\|raw\|file\)~/$main_branch/\1~g" "$project_folder/README.md"
-  sed -i "s~ref=$PROJECT_BRANCH~ref=$main_branch~g" "$project_folder/README.md"
+  sed -i "s~/$PROJECT_BRANCH/\(pipeline\|raw\|file\)~/$main_branch/\1~g" "$project_folder/$README_FILE"
+  sed -i "s~ref=$PROJECT_BRANCH~ref=$main_branch~g" "$project_folder/$README_FILE"
 }
 update_user_repo() {
   project_ns="$REMOTE_NS/$1"
   project_folder="$CACHE_FOLDER/$project_ns"
   # update from assignment
   rsync -a --delete --exclude .git/ "$PROJECT_FOLDER/" "$project_folder"
-  # replace remote in README.md
+  # replace remote in readme file
   main_branch=$(git -C "$project_folder" remote show origin | grep "HEAD branch:" | tr -d " " | cut -d: -f2)
-  [[ $REPLACE_README == 1 ]] \
+  [[ $README_REPLACE == 1 ]] \
     && replace_readme "$project_ns" "$project_folder" "$main_branch"
   git_status_empty "$project_folder" \
     && return
@@ -308,13 +305,13 @@ SCRIPT_NAME=$(basename "$0")
 REMOTE_NS=""
 PROJECT_FOLDER="." # current folder
 USER_LIST=""
-REPLACE_README=0
+README_FILE="README.md"
+README_REPLACE=0
 SET_DEVEL="auto"
 CACHE_FOLDER="$HOME/.cad_cache"
 GITLAB_URL="gitlab.com"
 TOKEN_FILE=".gitlab_access_token"
 TOKEN_PATH="$HOME/$TOKEN_FILE"
-DONE=" done "
 SOURCE_BRANCH="source"
 PROJECT_NS=""
 PROJECT_ID=""
@@ -341,7 +338,7 @@ OPTIONS
               GitLab root namespace, where root must exist, e.g. umiami/george/csc220/fall20
 
       -r, --replace
-              Replace any occurrence of assignment project remote URL with user project remote URL in README.md file.
+              Replace any occurrence of assignment project remote URL with user project remote URL in $README_FILE file.
 
       -u, --usernames=USER_LIST
               List of one or more solvers separated by space or newline, e.g. 'user1 user2'.
@@ -366,7 +363,7 @@ while (( $# > 0 )); do
     -f|--folder) shift; PROJECT_FOLDER="$1"; shift ;;
     -h|--help) echo -e "$USAGE" && exit 0 ;;
     -n|--namespace) shift; REMOTE_NS="$1"; shift ;;
-    -r|--replace) REPLACE_README=1; shift ;;
+    -r|--replace) README_REPLACE=1; shift ;;
     -u|--usernames) shift; USER_LIST="$1"; shift ;;
     --) shift; break ;;
     *-) echo "$0: Unrecognized option '$1'" >&2; exit 2 ;;
@@ -395,32 +392,34 @@ check_command "git" \
   || exception "Command git is required"
 check_command "jq" \
   || exception "Command jq is required"
-msg_end "$DONE"
+msg_end
 
 msg_start "Checking paths"
-[[ ! -d "$PROJECT_FOLDER" ]] \
-  && exception "$PROJECT_FOLDER is not a directory"
-[[ $REPLACE_README == 1 && ! -f "$PROJECT_FOLDER/README.md" ]] \
-  && exception "Project folder missing README.md"
-msg_end "$DONE"
+PROJECT_FOLDER=$(readlink -f "$PROJECT_FOLDER")
+[[ -d "$PROJECT_FOLDER" ]] \
+  || exception "Project folder not found."
+[[ $README_REPLACE == 1 && ! -f "$PROJECT_FOLDER/$README_FILE" ]] \
+  && exception "Readme file not found."
+msg_end
 
 authorize \
   || exception "Unable to authorize"
 TOKEN=$(cat "$TOKEN_PATH")
 
-PROJECT_FOLDER=$(readlink -f "$PROJECT_FOLDER")
+msg_start "Getting project information"
 if [[ -d "$PROJECT_FOLDER/.git" ]]; then
   PROJECT_NS=$(get_remote_namespace "$PROJECT_FOLDER") \
     && PROJECT_ID=$(get_project_id "$PROJECT_NS") \
     && PROJECT_BRANCH=$(git_current_branch "$PROJECT_FOLDER") \
     || exit 1
 fi
+msg_end
 
 msg_start "Creating / checking namespace"
 group_id=$(get_group_id "$REMOTE_NS" 2>/dev/null) \
   || group_id=$(create_ns "$REMOTE_NS") \
   || exit 1
-msg_end "$DONE"
+msg_end
 
 # process users
 for user in $USER_LIST; do
@@ -428,5 +427,5 @@ for user in $USER_LIST; do
   init_user_repo "$user" "$group_id" \
     && update_user_repo "$user" \
     || exit 1
-  msg_end "$DONE"
+  msg_end
 done
