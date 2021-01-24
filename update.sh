@@ -138,7 +138,7 @@ gitlab_api() {
   response=$(curl --silent --write-out "\n%{http_code}\n" \
     --header "Authorization: Bearer $TOKEN" \
     --header "Content-Type: application/json" \
-    --request $req --data "${2:-{\}}" "$GITLAB_URL/$1")
+    --request $req --data "${2:-{\}}" "https://$GITLAB_URL/$1")
   status="$(echo "$response" | sed -n '$p')"
   output="$(echo "$response" | sed '$d')"
   [[ "$status" != 20* ]] \
@@ -159,8 +159,7 @@ authorize() {
     | jq -r '.access_token' > "$ACCESS_TOKEN_PATH"
 }
 get_project_id() {
-  gitlab_api "api/v4/projects?search=$(basename "$1")" \
-    | jq -r --arg ns "$1" '.[] | select(.path_with_namespace==$ns) | .id'
+  gitlab_api "api/v4/projects/${1//\//%2F}" | jq .id
 }
 get_group_id() {
   gitlab_api "api/v4/groups?search=$1" \
@@ -168,7 +167,6 @@ get_group_id() {
 }
 create_request() {
   project_id="$(get_project_id "$1")" \
-    || [[ -n "$project_id" ]] \
     || exit 1
   gitlab_api "api/v4/projects/$project_id/merge_requests" \
     "{\"id\":\"$project_id\", \"source_branch\":\"$SOURCE_BRANCH\", \"target_branch\":\"master\", \
@@ -240,7 +238,7 @@ init_user_repo() {
       && exception "User $user does not exist"
     project_id="$(create_project "$group_id" "$user" "$user_id")" \
       && add_developer "$project_id" "$user_id" \
-      && copy_issues "$user_id" \
+      && copy_issues "$project_id" "$user_id" \
       || exit 1
     rm -rf "$user_project_folder"
   fi
@@ -249,6 +247,8 @@ init_user_repo() {
     actual_remote_ns=$(get_remote_namespace "$user_project_folder") \
       || exit 1
     [[ "$actual_remote_ns" != "$user_project_ns" ]] \
+      && echo "actual[$actual_remote_ns]" \
+      && echo "user[$user_project_ns]" \
       && exception "Invalid user project remote origin url"
     git_pull "$user_project_folder" "origin $SOURCE_BRANCH:$SOURCE_BRANCH" \
       || exit 1
@@ -271,9 +271,7 @@ replace_readme() {
   user_project_ns="$1"
   user_project_folder="$2"
   main_branch="$3"
-  project_ns=$(get_remote_namespace "$PROJECT_FOLDER") \
-    || exit 1
-  sed -i "s~/$project_ns/~/$user_project_ns/~g" "$user_project_folder/README.md"
+  sed -i "s~/$PROJECT_NS/~/$user_project_ns/~g" "$user_project_folder/README.md"
   [[ -z "$PROJECT_BRANCH" ]] \
     && return
   sed -i "s~/$PROJECT_BRANCH/\(pipeline\|raw\|file\)~/$main_branch/\1~g" "$user_project_folder/README.md"
@@ -302,18 +300,14 @@ update_user_repo() {
   create_request "$user_project_ns" "$main_branch" "$SOURCE_BRANCH"
 }
 get_remote_namespace() {
-  # read repostiroy URL and trim hostname prefix and .git suffix
-  git -C "$1" config --get remote.origin.url | sed 's/^[^:]*://;s/\.git$//' \
-    || exception "Unable to acquire $1 remote namespace"
+  # shellcheck disable=SC1087
+  git -C "$1" config --get remote.origin.url | sed "s/^.*$GITLAB_URL[:/]//;s/.git$//"
 }
 read_issues() {
-  src_remote_namespace=$(get_remote_namespace "$PROJECT_FOLDER") \
-    || exit 1
-  [[ -z "$src_remote_namespace" ]] \
+  [[ -z "$PROJECT_ID" ]] \
     && ISSUES_COUNT=0 \
     && return
-  src_project_id=$(get_project_id "$src_remote_namespace") \
-    && ISSUES=$(gitlab_api "api/v4/projects/$src_project_id/issues?labels=assignment") \
+  ISSUES=$(gitlab_api "api/v4/projects/$PROJECT_ID/issues?labels=assignment") \
     && ISSUES_COUNT=$(jq length <<< "$ISSUES") \
     || exit 1
 }
@@ -322,9 +316,9 @@ copy_issues() {
     && read_issues
   for (( i=0; i < ISSUES_COUNT; i++ )); do
     issue=$(jq ".[$i] | { title,description,due_date }" <<< "$ISSUES")
-    [[ -n "$1" ]] \
-      && issue=$(jq --arg a "$1" '. + {assignee_ids:[$a]}' <<< "$issue")
-    gitlab_api "api/v4/projects/$project_id/issues" "$issue" \
+    [[ -n "$2" ]] \
+      && issue=$(jq --arg a "$2" '. + {assignee_ids:[$a]}' <<< "$issue")
+    gitlab_api "api/v4/projects/$1/issues" "$issue" \
       || exit 1
   done
 }
@@ -338,11 +332,13 @@ REPLACE_README_REMOTE=0
 DEV_MODE="auto"
 CACHE_FOLDER=".cad_cache"
 USER_CACHE_FOLDER="$HOME/$CACHE_FOLDER"
-GITLAB_URL="https://gitlab.com"
+GITLAB_URL="gitlab.com"
 ACCESS_TOKEN_FILE=".gitlab_access_token"
 ACCESS_TOKEN_PATH="$HOME/$ACCESS_TOKEN_FILE"
 DONE=" done "
 SOURCE_BRANCH="source"
+PROJECT_NS=""
+PROJECT_ID=""
 PROJECT_BRANCH=""
 ISSUES=""
 ISSUES_COUNT=-1
@@ -411,11 +407,6 @@ done
 [[ $usernames == 0 ]] \
   && exception "Missing or empty USER_LIST option" 2
 
-PROJECT_FOLDER="$(readlink -f "$PROJECT_FOLDER")"
-[[ ! -d "$PROJECT_FOLDER/.git" ]] \
-  || PROJECT_BRANCH="$(git_current_branch "$PROJECT_FOLDER")" \
-  || exit 1
-
 # # redir stdin
 # exec 3<&0
 # exec 0</dev/tty
@@ -437,6 +428,14 @@ msg_end "$DONE"
 authorize \
   || exception "Unable to authorize"
 TOKEN="$(cat "$ACCESS_TOKEN_PATH")"
+
+PROJECT_FOLDER="$(readlink -f "$PROJECT_FOLDER")"
+if [[ -d "$PROJECT_FOLDER/.git" ]]; then
+  PROJECT_NS=$(get_remote_namespace "$PROJECT_FOLDER") \
+    && PROJECT_ID=$(get_project_id "$PROJECT_NS") \
+    && PROJECT_BRANCH="$(git_current_branch "$PROJECT_FOLDER")" \
+    || exit 1
+fi
 
 # process users
 msg_start "Creating / checking remote path $REMOTE_NAMESPACE"
