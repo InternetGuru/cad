@@ -246,9 +246,10 @@ init_user_repo() {
   fi
   if [[ -d "$user_project_folder" ]]; then
     # verify local remote
-    actual_remote_url="$(git -C "$user_project_folder" config remote.origin.url)"
-    [[ "$actual_remote_url" =~ /$user_project_ns.git$ ]] \
-      || exception "Invalid user project remote origin url"
+    actual_remote_ns=$(get_remote_namespace "$user_project_folder") \
+      || exit 1
+    [[ "$actual_remote_ns" != "$user_project_ns" ]] \
+      && exception "Invalid user project remote origin url"
     git_pull "$user_project_folder" "origin $SOURCE_BRANCH:$SOURCE_BRANCH" \
       || exit 1
   else
@@ -270,9 +271,8 @@ replace_readme() {
   user_project_ns="$1"
   user_project_folder="$2"
   main_branch="$3"
-  project_remote="$(git -C "$PROJECT_FOLDER" config remote.origin.url)"
-  project_ns="${project_remote#*:}"
-  project_ns="${project_ns%.git}"
+  project_ns=$(get_remote_namespace "$PROJECT_FOLDER") \
+    || exit 1
   sed -i "s~/$project_ns/~/$user_project_ns/~g" "$user_project_folder/README.md"
   [[ -z "$PROJECT_BRANCH" ]] \
     && return
@@ -303,11 +303,11 @@ update_user_repo() {
 }
 get_remote_namespace() {
   # read repostiroy URL and trim hostname prefix and .git suffix
-  git -C "$PROJECT_FOLDER" config --get remote.origin.url | sed 's/^[^:]*://;s/\.git$//' \
-    || exception "Unable to acquire remote namespace"
+  git -C "$1" config --get remote.origin.url | sed 's/^[^:]*://;s/\.git$//' \
+    || exception "Unable to acquire $1 remote namespace"
 }
 read_issues() {
-  src_remote_namespace=$(get_remote_namespace) \
+  src_remote_namespace=$(get_remote_namespace "$PROJECT_FOLDER") \
     || exit 1
   [[ -z "$src_remote_namespace" ]] \
     && ISSUES_COUNT=0 \
