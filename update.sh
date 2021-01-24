@@ -45,7 +45,7 @@ prompt() {
 set_dev_mode() {
   case "$1" in
     always|never|auto)
-      DEV_MODE=$1
+      SET_DEVEL=$1
       return 0
     ;;
   esac
@@ -147,7 +147,7 @@ gitlab_api() {
   echo "$output"
 }
 authorize() {
-  [[ -s "$ACCESS_TOKEN_PATH" ]] \
+  [[ -s "$TOKEN_PATH" ]] \
     && return
   prompt "Username"
   username="$REPLY"
@@ -156,7 +156,7 @@ authorize() {
   echo
   gitlab_api "oauth/token" \
     "{\"grant_type\":\"password\",\"username\":\"$username\",\"password\":\"$password\"}" \
-    | jq -r '.access_token' > "$ACCESS_TOKEN_PATH"
+    | jq -r '.access_token' > "$TOKEN_PATH"
 }
 get_project_id() {
   gitlab_api "api/v4/projects/${1//\//%2F}" | jq .id
@@ -224,80 +224,78 @@ create_namespace() {
 init_user_repo() {
   user="$1"
   group_id="$2"
-  user_project_ns="$REMOTE_NAMESPACE/$user"
-  user_project_folder="$USER_CACHE_FOLDER/$user_project_ns"
-  remote_url="https://oauth2:$TOKEN@gitlab.com/$user_project_ns.git"
+  project_ns="$REMOTE_NS/$user"
+  project_folder="$CACHE_FOLDER/$project_ns"
+  remote_url="https://oauth2:$TOKEN@gitlab.com/$project_ns.git"
   err="$(git ls-remote "$remote_url" 2>&1 >/dev/null)"
 
   if [[ -n "$err" ]]; then
     user_id=""
-    [[ $DEV_MODE == "never" ]] \
+    [[ $SET_DEVEL == "never" ]] \
       || user_id="$(get_user_id "$user")" \
       || exit 1
-    [[ $DEV_MODE == "always" && -z "$user_id" ]] \
+    [[ $SET_DEVEL == "always" && -z "$user_id" ]] \
       && exception "User $user does not exist"
     project_id="$(create_project "$group_id" "$user" "$user_id")" \
       && add_developer "$project_id" "$user_id" \
       && copy_issues "$project_id" "$user_id" \
       || exit 1
-    rm -rf "$user_project_folder"
+    rm -rf "$project_folder"
   fi
-  if [[ -d "$user_project_folder" ]]; then
+  if [[ -d "$project_folder" ]]; then
     # verify local remote
-    actual_remote_ns=$(get_remote_namespace "$user_project_folder") \
+    actual_remote_ns=$(get_remote_namespace "$project_folder") \
       || exit 1
-    [[ "$actual_remote_ns" != "$user_project_ns" ]] \
-      && echo "actual[$actual_remote_ns]" \
-      && echo "user[$user_project_ns]" \
+    [[ "$actual_remote_ns" != "$project_ns" ]] \
       && exception "Invalid user project remote origin url"
-    git_pull "$user_project_folder" "origin $SOURCE_BRANCH:$SOURCE_BRANCH" \
+    git_pull "$project_folder" "origin $SOURCE_BRANCH:$SOURCE_BRANCH" \
       || exit 1
   else
     # clone existing remote
-    git clone -q "$remote_url" "$user_project_folder" 2>/dev/null \
-      || exception "Unable to clone user project $user_project_ns"
+    git clone -q "$remote_url" "$project_folder" 2>/dev/null \
+      || exception "Unable to clone user project $project_ns"
   fi
   # create first commit in case of empty repo (stay on main branch for update)
-  if ! git -C "$user_project_folder" log >/dev/null 2>&1; then
-    git_commit "initial commit" "$user_project_folder" "--allow-empty"
-    git_push "--all" "$user_project_folder"
+  if ! git -C "$project_folder" log >/dev/null 2>&1; then
+    git_commit "initial commit" "$project_folder" "--allow-empty"
+    git_push "--all" "$project_folder"
     return
   fi
   # checkout SOURCE_BRANCH
-  git_checkout "$SOURCE_BRANCH" "$user_project_folder" \
+  git_checkout "$SOURCE_BRANCH" "$project_folder" \
     || exception "Missing $SOURCE_BRANCH"
 }
 replace_readme() {
-  user_project_ns="$1"
-  user_project_folder="$2"
+  project_ns="$1"
+  project_folder="$2"
   main_branch="$3"
-  sed -i "s~/$PROJECT_NS/~/$user_project_ns/~g" "$user_project_folder/README.md"
+  sed -i "s~/$PROJECT_NS/~/$project_ns/~g" "$project_folder/README.md"
   [[ -z "$PROJECT_BRANCH" ]] \
     && return
-  sed -i "s~/$PROJECT_BRANCH/\(pipeline\|raw\|file\)~/$main_branch/\1~g" "$user_project_folder/README.md"
-  sed -i "s~ref=$PROJECT_BRANCH~ref=$main_branch~g" "$user_project_folder/README.md"
+  sed -i "s~/$PROJECT_BRANCH/\(pipeline\|raw\|file\)~/$main_branch/\1~g" "$project_folder/README.md"
+  sed -i "s~ref=$PROJECT_BRANCH~ref=$main_branch~g" "$project_folder/README.md"
 }
 update_user_repo() {
-  user_project_ns="$REMOTE_NAMESPACE/$1"
-  user_project_folder="$USER_CACHE_FOLDER/$user_project_ns"
+  project_ns="$REMOTE_NS/$1"
+  project_folder="$CACHE_FOLDER/$project_ns"
   # update from assignment
-  rsync -a --delete --exclude .git/ "$PROJECT_FOLDER/" "$user_project_folder"
+  rsync -a --delete --exclude .git/ "$PROJECT_FOLDER/" "$project_folder"
   # replace remote in README.md
-  main_branch="$(git -C "$user_project_folder" remote show origin | grep "HEAD branch:" | tr -d " " | cut -d: -f2)"
-  [[ $REPLACE_README_REMOTE == 1 ]] \
-    && replace_readme "$user_project_ns" "$user_project_folder" "$main_branch"
-  git_status_empty "$user_project_folder" \
+  main_branch="$(git -C "$project_folder" remote show origin | grep "HEAD branch:" | tr -d " " | cut -d: -f2)"
+  [[ $REPLACE_README == 1 ]] \
+    && replace_readme "$project_ns" "$project_folder" "$main_branch"
+  git_status_empty "$project_folder" \
     && return
   # commit
-  git_add_all "$user_project_folder"
-  git_commit "Update assignment" "$user_project_folder"
+  git_add_all "$project_folder"
+  git_commit "Update assignment" "$project_folder"
   # if first commit create SOURCE_BRANCH on main branch and push both
-  git_checkout "-B $SOURCE_BRANCH" "$user_project_folder"
-  git_push "--all" "$user_project_folder"
+  git_checkout "-B $SOURCE_BRANCH" "$project_folder"
+  git_push "--all" "$project_folder"
   # create PR iff new commit
-  git_same_commit "$main_branch" "$SOURCE_BRANCH" "$user_project_folder" \
+  git_same_commit "$main_branch" "$SOURCE_BRANCH" "$project_folder" \
     && return
-  create_request "$user_project_ns" "$main_branch" "$SOURCE_BRANCH"
+  create_request "$project_ns" "$main_branch" "$SOURCE_BRANCH"
 }
 get_remote_namespace() {
   # shellcheck disable=SC1087
@@ -325,16 +323,15 @@ copy_issues() {
 
 ## default global variables
 SCRIPT_NAME="$(basename "$0")"
-REMOTE_NAMESPACE=""
+REMOTE_NS=""
 PROJECT_FOLDER="." # current folder
 USER_LIST=""
-REPLACE_README_REMOTE=0
-DEV_MODE="auto"
-CACHE_FOLDER=".cad_cache"
-USER_CACHE_FOLDER="$HOME/$CACHE_FOLDER"
+REPLACE_README=0
+SET_DEVEL="auto"
+CACHE_FOLDER="$HOME/.cad_cache"
 GITLAB_URL="gitlab.com"
-ACCESS_TOKEN_FILE=".gitlab_access_token"
-ACCESS_TOKEN_PATH="$HOME/$ACCESS_TOKEN_FILE"
+TOKEN_FILE=".gitlab_access_token"
+TOKEN_PATH="$HOME/$TOKEN_FILE"
 DONE=" done "
 SOURCE_BRANCH="source"
 PROJECT_NS=""
@@ -386,8 +383,8 @@ while (( $# > 0 )); do
     -d|--developer) shift; set_dev_mode "$1" || exit 2; shift ;;
     -f|--folder) shift; PROJECT_FOLDER="$1"; shift ;;
     -h|--help) echo -e "$USAGE" && exit 0 ;;
-    -n|--namespace) shift; REMOTE_NAMESPACE="$1"; shift ;;
-    -r|--replace) REPLACE_README_REMOTE=1; shift ;;
+    -n|--namespace) shift; REMOTE_NS="$1"; shift ;;
+    -r|--replace) REPLACE_README=1; shift ;;
     -u|--usernames) shift; USER_LIST="$1"; shift ;;
     --) shift; break ;;
     *-) echo "$0: Unrecognized option '$1'" >&2; exit 2 ;;
@@ -396,8 +393,8 @@ while (( $# > 0 )); do
 done
 
 # parameter validation
-[[ ! "$REMOTE_NAMESPACE" =~ ^[a-z0-9]{2,}(/[a-z0-9]{2,}){2,}$ ]] \
-  && exception "Missing or invalid REMOTE_NAMESPACE option, value '$REMOTE_NAMESPACE'" 2
+[[ ! "$REMOTE_NS" =~ ^[a-z0-9]{2,}(/[a-z0-9]{2,}){2,}$ ]] \
+  && exception "Missing or invalid REMOTE_NAMESPACE option, value '$REMOTE_NS'" 2
 usernames=0
 for user in $USER_LIST; do
   [[ ! "$user" =~ ^[a-z][a-z0-9_-]{4,}$ ]] \
@@ -421,13 +418,13 @@ msg_end "$DONE"
 msg_start "Checking paths"
 [[ ! -d "$PROJECT_FOLDER" ]] \
   && exception "$PROJECT_FOLDER is not a directory"
-[[ $REPLACE_README_REMOTE == 1 && ! -f "$PROJECT_FOLDER/README.md" ]] \
+[[ $REPLACE_README == 1 && ! -f "$PROJECT_FOLDER/README.md" ]] \
   && exception "Project folder missing README.md"
 msg_end "$DONE"
 
 authorize \
   || exception "Unable to authorize"
-TOKEN="$(cat "$ACCESS_TOKEN_PATH")"
+TOKEN="$(cat "$TOKEN_PATH")"
 
 PROJECT_FOLDER="$(readlink -f "$PROJECT_FOLDER")"
 if [[ -d "$PROJECT_FOLDER/.git" ]]; then
@@ -438,11 +435,11 @@ if [[ -d "$PROJECT_FOLDER/.git" ]]; then
 fi
 
 # process users
-msg_start "Creating / checking remote path $REMOTE_NAMESPACE"
-group_id="$(get_group_id "$REMOTE_NAMESPACE")" \
+msg_start "Creating / checking remote path $REMOTE_NS"
+group_id="$(get_group_id "$REMOTE_NS")" \
   || exit 1
 [[ -n "$group_id" ]] \
-  || group_id="$(create_namespace "$REMOTE_NAMESPACE")" \
+  || group_id="$(create_namespace "$REMOTE_NS")" \
   || exit 1
 msg_end "$DONE"
 for user in $USER_LIST; do
