@@ -162,8 +162,7 @@ get_project_id() {
   gitlab_api "api/v4/projects/${1//\//%2F}" | jq .id
 }
 get_group_id() {
-  gitlab_api "api/v4/groups?search=$1" \
-    | jq -r --arg full_path "$1" '.[] | select(.full_path==$full_path) | .id'
+  gitlab_api "api/v4/groups/${1//\//%2F}" | jq .id
 }
 create_request() {
   project_id=$(get_project_id "$1") \
@@ -195,31 +194,14 @@ get_user_id() {
   gitlab_api "api/v4/users?username=$1" \
     | jq -r '.[] | .id' | sed 's/null//'
 }
-create_namespace() {
-  # check or create subgroups
-  group_id=
-  full_path=
-  for group in $(echo "$1" | tr '/' ' '); do
-    # root group must exist
-    if [[ -z "$group_id" ]]; then
-      full_path="$group"
-      group_id=$(get_group_id "$full_path") \
-        || exit 1
-      [[ -z "$group_id" ]] \
-        && exception "Root group $group does not exist"
-      continue
-    fi
-    full_path="$full_path/$group"
-    tmp_group_id=$(get_group_id "$full_path") \
-      || exit 1
-    [[ -n "$tmp_group_id" ]] \
-      || tmp_group_id=$(create_group "$group" "$group_id") \
-      || exit 1
-    [[ -n "$tmp_group_id" ]] \
-      || exception "Unable to get/create group $group"
-    group_id="$tmp_group_id"
-  done
-  echo "$group_id"
+create_ns() {
+  parent_ns=$(dirname "$1")
+  [[ "$parent_ns" == . ]] \
+    && exception "Root group $1 does not exist"
+  parent_id=$(get_group_id "$parent_ns" 2>/dev/null) \
+    || create_ns "$parent_ns" \
+    || exit 1
+  create_group "$(basename "$1")" "$parent_id"
 }
 init_user_repo() {
   user="$1"
@@ -434,14 +416,13 @@ if [[ -d "$PROJECT_FOLDER/.git" ]]; then
     || exit 1
 fi
 
-# process users
-msg_start "Creating / checking remote path $REMOTE_NS"
-group_id=$(get_group_id "$REMOTE_NS") \
-  || exit 1
-[[ -n "$group_id" ]] \
-  || group_id=$(create_namespace "$REMOTE_NS") \
+msg_start "Creating / checking namespace"
+group_id=$(get_group_id "$REMOTE_NS" 2>/dev/null) \
+  || group_id=$(create_ns "$REMOTE_NS") \
   || exit 1
 msg_end "$DONE"
+
+# process users
 for user in $USER_LIST; do
   msg_start "Updating user repository for $user"
   init_user_repo "$user" "$group_id" \
