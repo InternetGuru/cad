@@ -158,6 +158,9 @@ authorize() {
 get_project_id() {
   gitlab_api "api/v4/projects/${1//\//%2F}" | jq .id
 }
+project_exists() {
+  get_project_id "$1" >/dev/null 2>&1
+}
 get_group_id() {
   gitlab_api "api/v4/groups/${1//\//%2F}" | jq .id
 }
@@ -176,8 +179,14 @@ create_project() {
     "{\"namespace_id\":\"$1\", \"name\":\"$2\", \"visibility\":\"$visibility\"}" \
     | jq -r '.id'
 }
+get_role() {
+  gitlab_api "api/v4/projects/$1/members/all/$2" | jq -r '.access_level'
+}
 add_developer() {
   [[ -z "$2" ]] \
+    && return
+  role=$(get_role "$1" "$2" 2>/dev/null)
+  (( role >= 30 )) \
     && return
   gitlab_api "api/v4/projects/$1/members" \
     "{\"access_level\":\"30\", \"user_id\":\"$2\"}" >/dev/null
@@ -205,10 +214,7 @@ init_user_repo() {
   group_id="$2"
   project_ns="$REMOTE_NS/$user"
   project_folder="$CACHE_FOLDER/$project_ns"
-  remote_url="https://oauth2:$TOKEN@gitlab.com/$project_ns.git"
-  err=$(git ls-remote "$remote_url" 2>&1 >/dev/null)
-
-  if [[ -n "$err" ]]; then
+  if ! project_exists "$project_ns"; then
     user_id=""
     [[ $SET_DEVEL == "never" ]] \
       || user_id=$(get_user_id "$user") \
@@ -231,6 +237,7 @@ init_user_repo() {
       || exit 1
   else
     # clone existing remote
+    remote_url="https://oauth2:$TOKEN@gitlab.com/$project_ns.git"
     git clone -q "$remote_url" "$project_folder" 2>/dev/null \
       || exception "Unable to clone user project $project_ns"
   fi
@@ -377,7 +384,7 @@ done
 usernames=0
 for user in $USER_LIST; do
   [[ ! "$user" =~ ^[a-z][a-z0-9_-]{4,}$ ]] \
-    && exception "Invalid user format, value '$user'" 2
+    && exception "Unsupported user format, value '$user'" 2
   (( usernames++ ))
 done
 [[ $usernames == 0 ]] \
@@ -415,7 +422,7 @@ if [[ -d "$PROJECT_FOLDER/.git" ]]; then
 fi
 msg_end
 
-msg_start "Creating / checking namespace"
+msg_start "Processing namespace"
 group_id=$(get_group_id "$REMOTE_NS" 2>/dev/null) \
   || group_id=$(create_ns "$REMOTE_NS") \
   || exit 1
@@ -423,7 +430,7 @@ msg_end
 
 # process users
 for user in $USER_LIST; do
-  msg_start "Updating user repository for $user"
+  msg_start "Processing repository for $user"
   init_user_repo "$user" "$group_id" \
     && update_user_repo "$user" \
     || exit 1
