@@ -44,7 +44,7 @@ prompt() {
 }
 set_dev_mode() {
   case "$1" in
-    $MODE_ALWAYS|$MODE_NEVER|$MODE_AUTO)
+    "$MODE_ALWAYS"|"$MODE_NEVER"|"$MODE_AUTO")
       SET_DEVEL=$1
       return 0
     ;;
