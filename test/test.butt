@@ -2,7 +2,7 @@
 
 i=0
 status=""
-ga="update.sh"
+ga="./update.sh"
 
 #######################################
 ## Param validation

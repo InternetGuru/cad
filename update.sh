@@ -11,16 +11,16 @@ msg_start() {
   [[ $MSG_STATUS == 1 ]] \
     && exception "Message already started"
   MSG_STATUS=1
-  echo -n "$1 ... " >&2
+  printf -- "%s ... " "$@" >&2
 }
 msg_end() {
   [[ $MSG_STATUS == 0 ]] \
     && exception "Message not started"
   MSG_STATUS=0
-  echo "[ done ]" >&2
+  printf "[ done ]\n" >&2
 }
 confirm() {
-  echo -n "${1:-"Are you sure?"} [YES/No] " >&2
+  printf -- "%s [YES/No] " "${1:-"Are you sure?"}" >&2
   clear_stdin
   read -r
   [[ "$REPLY" =~ ^[Yy]([Ee][Ss])?$ || -z "$REPLY" ]] \
@@ -30,9 +30,9 @@ confirm() {
   confirm "Type"
 }
 prompt() {
-  echo -n "${1:-Enter value}: "
+  printf -- "%s: " "${1:-Enter value}" >&2
   clear_stdin
-  # do not echo output (e.g. for password)
+  # silent user input (e.g. for password)
   if [[ $2 == silent ]]; then
     read -rs
   else
@@ -53,11 +53,11 @@ set_dev_mode() {
   return 2
 }
 exception() {
-  echo "EXCEPTION: ${1:-$SCRIPT_NAME Unknown exception}" >&2
+  printf -- "EXCEPTION: %s\n" "${1:-$SCRIPT_NAME Unknown exception}" >&2
   exit "${2:-1}"
 }
 format_usage() {
-  echo -e "$1" | fmt -w "$(tput cols)"
+  printf -- "%s\n" "$1" | fmt -w "$(tput cols)"
 }
 check_command() {
   command -v "$1" >/dev/null 2>&1
@@ -72,7 +72,7 @@ git_current_branch() {
   local out
   out=$(git -C "${1:-.}" rev-parse --abbrev-ref HEAD) \
     || exception "$out"
-  echo "$out"
+  printf -- "%s\n" "$out"
 }
 git_same_commit() {
   [[ "$( git -C "${3:-.}" rev-parse "$1" )" == "$( git -C "${3:-.}" rev-parse "$2" )" ]]
@@ -136,12 +136,12 @@ gitlab_api() {
     --header "Authorization: Bearer $TOKEN" \
     --header "Content-Type: application/json" \
     --request $req --data "${2:-{\}}" "https://$GITLAB_URL/$1")
-  status=$(echo "$response" | sed -n '$p')
-  output=$(echo "$response" | sed '$d')
+  status=$(printf -- "%s\n" "$response" | sed -n '$p')
+  output=$(printf -- "%s\n" "$response" | sed '$d')
   [[ "$status" != 20* ]] \
-    && echo "$output" >&2 \
+    && printf -- "%s\n" "$output" >&2 \
     && exception "Invalid request $1 [$status]"
-  echo "$output"
+  printf -- "%s\n" "$output"
 }
 authorize() {
   [[ -s "$TOKEN_PATH" ]] \
@@ -368,12 +368,12 @@ while (( $# > 0 )); do
   case $1 in
     -d|--developer) shift; set_dev_mode "$1" || exit 2; shift ;;
     -f|--folder) shift; PROJECT_FOLDER="$1"; shift ;;
-    -h|--help) echo -e "$USAGE" && exit 0 ;;
+    -h|--help) printf -- "%s\n" "$USAGE" && exit 0 ;;
     -n|--namespace) shift; REMOTE_NS="$1"; shift ;;
     -r|--replace) README_REPLACE=1; shift ;;
     -u|--usernames) shift; USER_LIST="$1"; shift ;;
     --) shift; break ;;
-    *-) echo "$0: Unrecognized option '$1'" >&2; exit 2 ;;
+    *-) printf -- "%s: Unrecognized option '%s'\n" "$0" "$1" >&2; exit 2 ;;
      *) break ;;
   esac
 done
