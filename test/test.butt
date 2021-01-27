@@ -2,7 +2,7 @@
 
 i=0
 status=""
-ga="update.sh"
+ga="./update.sh"
 
 #######################################
 ## Param validation
@@ -13,8 +13,8 @@ correct_ns="umiami/test/csc220"
 start "help"
   debug "$ga --help"
   assert_equal "$status" 0
-  assert_startwith "${outlines[0]}" "DESCRIPTION"
-  assert_startwith "${outlines[1]}" "      update.sh distributes PROJECT_FOLDER into one or more"
+  assert_startwith "${outlines[0]}" "USAGE"
+  assert_startwith "${outlines[1]}" "      update.sh -n REMOTE_NAMESPACE"
 end
 #######################################
 : $((i++))
@@ -35,11 +35,11 @@ end
 start "invalid -u"
   debug "$ga -n '$correct_ns' -u 'a'"
   assert_equal "$status" 2
-  assert_startwith "${errlines[0]}" "EXCEPTION: Invalid user format, value 'a'"
+  assert_startwith "${errlines[0]}" "EXCEPTION: Unsupported user format, value 'a'"
   debug "$ga -n '$correct_ns' -u 'aaaaaa
   b'"
   assert_equal "$status" 2
-  assert_startwith "${errlines[0]}" "EXCEPTION: Invalid user format, value 'b'"
+  assert_startwith "${errlines[0]}" "EXCEPTION: Unsupported user format, value 'b'"
 end
 #######################################
 : $((i++))
@@ -53,14 +53,14 @@ end
 start "-u invalid format"
   debug "$ga -n '$correct_ns' -u 'user1 a'"
   assert_equal "$status" 2
-  assert_startwith "${errlines[0]}" "EXCEPTION: Invalid user format, value 'a'"
+  assert_startwith "${errlines[0]}" "EXCEPTION: Unsupported user format, value 'a'"
 end
 #######################################
 : $((i++))
 start "-f invalid path"
   debug "$ga -n '$correct_ns' -u 'user1' -f '/foo'"
   assert_equal "$status" 1
-  assert_startwith "${errlines[1]}" "Checking paths ... EXCEPTION: /foo is not a directory"
+  assert_startwith "${errlines[1]}" "Checking paths ... EXCEPTION: Project folder not found."
 end
 #######################################
 ## Requirements
