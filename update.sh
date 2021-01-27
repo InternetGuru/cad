@@ -129,6 +129,7 @@ git_fetch_all() {
     || exception "$out"
 }
 gitlab_api() {
+  local req response status output
   req="GET"
   [[ -n "$2" ]] \
     && req="POST"
@@ -144,6 +145,7 @@ gitlab_api() {
   printf -- "%s\n" "$output"
 }
 authorize() {
+  local username password
   [[ -s "$TOKEN_PATH" ]] \
     && return
   prompt "Username"
@@ -165,6 +167,7 @@ get_group_id() {
   gitlab_api "api/v4/groups/${1//\//%2F}" | jq .id
 }
 create_request() {
+  local project_id
   project_id=$(get_project_id "$1") \
     || exit 1
   gitlab_api "api/v4/projects/$project_id/merge_requests" \
@@ -172,6 +175,7 @@ create_request() {
     \"remove_source_branch\": \"false\", \"title\": \"Update from $SOURCE_BRANCH branch\"}" >/dev/null
 }
 create_project() {
+  local visibility
   visibility="public"
   [[ -n "$3" ]] \
     && visibility="private"
@@ -183,6 +187,7 @@ get_role() {
   gitlab_api "api/v4/projects/$1/members/all/$2" | jq -r '.access_level'
 }
 add_developer() {
+  local role
   [[ -z "$2" ]] \
     && return
   role=$(get_role "$1" "$2" 2>/dev/null)
@@ -201,6 +206,7 @@ get_user_id() {
     | jq -r '.[] | .id' | sed 's/null//'
 }
 create_ns() {
+  local parent_ns parent_id
   parent_ns=$(dirname "$1")
   [[ "$parent_ns" == . ]] \
     && exception "Root group $1 does not exist"
@@ -210,6 +216,7 @@ create_ns() {
   create_group "$(basename "$1")" "$parent_id"
 }
 init_user_repo() {
+  local user group_id project_ns project_folder user_id actual_remote_ns remote_url
   user="$1"
   group_id="$2"
   project_ns="$REMOTE_NS/$user"
@@ -252,6 +259,7 @@ init_user_repo() {
     || exception "Missing $SOURCE_BRANCH"
 }
 replace_readme() {
+  local project_ns project_folder main_branch
   project_ns="$1"
   project_folder="$2"
   main_branch="$3"
@@ -262,6 +270,7 @@ replace_readme() {
   sed -i "s~ref=$PROJECT_BRANCH~ref=$main_branch~g" "$project_folder/$README_FILE"
 }
 update_user_repo() {
+  local project_ns project_folder main_branch
   project_ns="$REMOTE_NS/$1"
   project_folder="$CACHE_FOLDER/$project_ns"
   # update from assignment
@@ -296,6 +305,7 @@ read_issues() {
     || exit 1
 }
 copy_issues() {
+  local issue
   (( "$ISSUES_COUNT" < 0 )) \
     && read_issues
   for (( i=0; i < ISSUES_COUNT; i++ )); do
@@ -381,13 +391,13 @@ done
 # parameter validation
 [[ ! "$REMOTE_NS" =~ ^[a-z0-9]{2,}(/[a-z0-9]{2,}){2,}$ ]] \
   && exception "Missing or invalid REMOTE_NAMESPACE option, value '$REMOTE_NS'" 2
-usernames=0
-for user in $USER_LIST; do
-  [[ ! "$user" =~ ^[a-z][a-z0-9_-]{4,}$ ]] \
-    && exception "Unsupported user format, value '$user'" 2
-  (( usernames++ ))
+USERNAMES=0
+for USER in $USER_LIST; do
+  [[ ! "$USER" =~ ^[a-z][a-z0-9_-]{4,}$ ]] \
+    && exception "Unsupported user format, value '$USER'" 2
+  (( USERNAMES++ ))
 done
-[[ $usernames == 0 ]] \
+[[ $USERNAMES == 0 ]] \
   && exception "Missing or empty USER_LIST option" 2
 
 # # redir stdin
@@ -423,16 +433,16 @@ fi
 msg_end
 
 msg_start "Processing namespace"
-group_id=$(get_group_id "$REMOTE_NS" 2>/dev/null) \
-  || group_id=$(create_ns "$REMOTE_NS") \
+GROUP_ID=$(get_group_id "$REMOTE_NS" 2>/dev/null) \
+  || GROUP_ID=$(create_ns "$REMOTE_NS") \
   || exit 1
 msg_end
 
 # process users
-for user in $USER_LIST; do
-  msg_start "Processing repository for $user"
-  init_user_repo "$user" "$group_id" \
-    && update_user_repo "$user" \
+for USER in $USER_LIST; do
+  msg_start "Processing repository for $USER"
+  init_user_repo "$USER" "$GROUP_ID" \
+    && update_user_repo "$USER" \
     || exit 1
   msg_end
 done
