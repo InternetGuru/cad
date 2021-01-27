@@ -302,7 +302,7 @@ copy_issues() {
     issue=$(jq ".[$i] | { title,description,due_date }" <<< "$ISSUES")
     [[ -n "$2" ]] \
       && issue=$(jq --arg a "$2" '. + {assignee_ids:[$a]}' <<< "$issue")
-    gitlab_api "api/v4/projects/$1/issues" "$issue" \
+    gitlab_api "api/v4/projects/$1/issues" "$issue" >/dev/null \
       || exit 1
   done
 }
