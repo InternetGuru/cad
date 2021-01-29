@@ -44,7 +44,7 @@ prompt() {
 }
 set_dev_mode() {
   case "$1" in
-    "$MODE_ALWAYS"|"$MODE_NEVER"|"$MODE_AUTO")
+    "$ALWAYS"|"$NEVER"|"$AUTO")
       SET_DEVEL=$1
       return 0
     ;;
@@ -223,10 +223,10 @@ init_user_repo() {
   project_folder="$CACHE_FOLDER/$project_ns"
   if ! project_exists "$project_ns"; then
     user_id=""
-    [[ $SET_DEVEL == "$MODE_NEVER" ]] \
+    [[ $SET_DEVEL == "$NEVER" ]] \
       || user_id=$(get_user_id "$user") \
       || exit 1
-    [[ $SET_DEVEL == "$MODE_ALWAYS" && -z "$user_id" ]] \
+    [[ $SET_DEVEL == "$ALWAYS" && -z "$user_id" ]] \
       && exception "User $user does not exist"
     project_id=$(create_project "$group_id" "$user" "$user_id") \
       && add_developer "$project_id" "$user_id" \
@@ -335,10 +335,10 @@ PROJECT_BRANCH=""
 ISSUES=""
 ISSUES_COUNT=-1
 MSG_STATUS=0
-MODE_ALWAYS="always"
-MODE_NEVER="never"
-MODE_AUTO="auto"
-SET_DEVEL="$MODE_AUTO"
+ALWAYS="always"
+NEVER="never"
+AUTO="auto"
+SET_DEVEL="$AUTO"
 
 ## usage
 USAGE=$(format_usage "USAGE
@@ -346,7 +346,7 @@ USAGE=$(format_usage "USAGE
 
 OPTIONS
       -d[MODE], --developer[=MODE]
-              Set developer rights to newly created projects '$MODE_ALWAYS', '$MODE_NEVER', or '$MODE_AUTO' (default).
+              Set developer rights to newly created projects '$ALWAYS', '$NEVER', or '$AUTO' (default).
 
       -f, --folder=PROJECT_FOLDER
               Path to project with the assignment, default current directory.
