@@ -305,7 +305,7 @@ read_issues() {
     || exit 1
 }
 copy_issues() {
-  local issue
+  local i issue
   (( "$ISSUES_COUNT" < 0 )) \
     && read_issues
   for (( i=0; i < ISSUES_COUNT; i++ )); do
