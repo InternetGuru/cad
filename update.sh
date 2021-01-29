@@ -56,8 +56,8 @@ exception() {
   printf -- "EXCEPTION: %s\n" "${1:-$SCRIPT_NAME Unknown exception}" >&2
   exit "${2:-1}"
 }
-format_usage() {
-  printf -- "%s\n" "$1" | fmt -w "$(tput cols)"
+print_usage() {
+  fmt -w "$(tput cols)" <<< "$USAGE"
 }
 check_command() {
   command -v "$1" >/dev/null 2>&1
@@ -137,8 +137,8 @@ gitlab_api() {
     --header "Authorization: Bearer $TOKEN" \
     --header "Content-Type: application/json" \
     --request $req --data "${2:-{\}}" "https://$GITLAB_URL/$1")
-  status=$(printf -- "%s\n" "$response" | sed -n '$p')
-  output=$(printf -- "%s\n" "$response" | sed '$d')
+  status=$(sed -n '$p' <<< "$response")
+  output=$(sed '$d' <<< "$response")
   [[ "$status" != 20* ]] \
     && printf -- "%s\n" "$output" >&2 \
     && exception "Invalid request $1 [$status]"
@@ -341,7 +341,7 @@ AUTO="auto"
 SET_DEVEL="$AUTO"
 
 ## usage
-USAGE=$(format_usage "USAGE
+USAGE="USAGE
       $SCRIPT_NAME -n REMOTE_NAMESPACE -u USER_LIST [-rh] [-f PROJECT_FOLDER]
 
 OPTIONS
@@ -362,7 +362,7 @@ OPTIONS
 
       -u, --usernames=USER_LIST
               List of one or more solvers separated by space or newline, e.g. 'user1 user2'.
-")
+"
 
 ## option preprocessing
 if ! LINE=$(
@@ -381,7 +381,7 @@ while (( $# > 0 )); do
   case $1 in
     -d|--developer) shift; set_dev_mode "$1" || exit 2; shift ;;
     -f|--folder) shift; PROJECT_FOLDER="$1"; shift ;;
-    -h|--help) printf -- "%s\n" "$USAGE" && exit 0 ;;
+    -h|--help) print_usage && exit 0 ;;
     -n|--namespace) shift; REMOTE_NS="$1"; shift ;;
     -r|--replace) README_REPLACE=1; shift ;;
     -u|--usernames) shift; USER_LIST="$1"; shift ;;
