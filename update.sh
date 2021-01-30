@@ -339,8 +339,6 @@ ALWAYS="always"
 NEVER="never"
 AUTO="auto"
 SET_DEVEL="$AUTO"
-
-## usage
 USAGE="USAGE
       $SCRIPT_NAME -n REMOTE_NAMESPACE -u USER_LIST [-rh] [-f PROJECT_FOLDER]
 
@@ -364,19 +362,15 @@ OPTIONS
               List of one or more solvers separated by space or newline, e.g. 'user1 user2'.
 "
 
-## option preprocessing
-if ! LINE=$(
-  getopt -n "$0" \
-        -o d::f:hn:ru: \
-        -l developer::,folder:,help,namespace:,replace,usernames: \
-        -- "$@"
-)
-then
-  exit 1
-fi
-eval set -- "$LINE"
+# get options
+OPT=$(getopt -n "$0" \
+  -o d:f:hn:ru: \
+  -l developer:,folder:,help,namespace:,replace,usernames: \
+  -- "$@") \
+  && eval set -- "$OPT" \
+  || exit 1
 
-## load user options
+# process options
 while (( $# > 0 )); do
   case $1 in
     -d|--developer) shift; set_dev_mode "$1" || exit 2; shift ;;
@@ -386,14 +380,15 @@ while (( $# > 0 )); do
     -r|--replace) README_REPLACE=1; shift ;;
     -u|--usernames) shift; USER_LIST="$1"; shift ;;
     --) shift; break ;;
-    *-) printf -- "%s: Unrecognized option '%s'\n" "$0" "$1" >&2; exit 2 ;;
      *) break ;;
   esac
 done
 
-# parameter validation
+# validate options
+[[ -z "$REMOTE_NS" ]] \
+  && exception "Missing REMOTE_NAMESPACE option" 2
 [[ ! "$REMOTE_NS" =~ ^[a-z0-9]{2,}(/[a-z0-9]{2,}){2,}$ ]] \
-  && exception "Missing or invalid REMOTE_NAMESPACE option, value '$REMOTE_NS'" 2
+  && exception "Invalid REMOTE_NAMESPACE option" 2
 USERNAMES=0
 for USER in $USER_LIST; do
   [[ ! "$USER" =~ ^[a-z][a-z0-9_-]{4,}$ ]] \
