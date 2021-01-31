@@ -166,12 +166,13 @@ project_exists() {
 get_group_id() {
   gitlab_api "api/v4/groups/${1//\//%2F}" | jq .id
 }
+request_exists() {
+  gitlab_api "api/v4/projects/$1/merge_requests?state=opened&source_branch=$SOURCE_BRANCH" \
+    | grep -qv "^\[\]$"
+}
 create_request() {
-  local project_id
-  project_id=$(get_project_id "$1") \
-    || exit 1
-  gitlab_api "api/v4/projects/$project_id/merge_requests" \
-    "{\"id\":\"$project_id\", \"source_branch\":\"$SOURCE_BRANCH\", \"target_branch\":\"master\", \
+  gitlab_api "api/v4/projects/$1/merge_requests" \
+    "{\"id\":\"$1\", \"source_branch\":\"$SOURCE_BRANCH\", \"target_branch\":\"master\", \
     \"remove_source_branch\": \"false\", \"title\": \"Update from $SOURCE_BRANCH branch\"}" >/dev/null
 }
 create_project() {
@@ -270,7 +271,7 @@ replace_readme() {
   sed -i "s~ref=$PROJECT_BRANCH~ref=$main_branch~g" "$project_folder/$README_FILE"
 }
 update_user_repo() {
-  local project_ns project_folder main_branch
+  local project_ns project_folder main_branch project_id
   project_ns="$REMOTE_NS/$1"
   project_folder="$CACHE_FOLDER/$project_ns"
   # update from assignment
@@ -290,7 +291,10 @@ update_user_repo() {
   # create PR iff new commit
   git_same_commit "$main_branch" "$SOURCE_BRANCH" "$project_folder" \
     && return
-  create_request "$project_ns" "$main_branch" "$SOURCE_BRANCH"
+  project_id=$(get_project_id "$project_ns") \
+    || exit 1
+  request_exists "$project_id" \
+    || create_request "$project_id"
 }
 get_remote_namespace() {
   # shellcheck disable=SC1087
