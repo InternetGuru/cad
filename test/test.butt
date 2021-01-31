@@ -2,7 +2,7 @@
 
 i=0
 status=""
-ga="update.sh"
+ga="./update.sh"
 
 #######################################
 ## Param validation
@@ -21,7 +21,7 @@ end
 start "missing -n"
   debug "$ga -u 'user1'"
   assert_equal "$status" 2
-  assert_startwith "${errlines[0]}" "EXCEPTION: Missing or invalid REMOTE_NAMESPACE option, value ''"
+  assert_startwith "${errlines[0]}" "EXCEPTION: Missing REMOTE_NAMESPACE option"
 end
 #######################################
 : $((i++))
@@ -46,7 +46,7 @@ end
 start "-n invalid format"
   debug "$ga -n 'umiami' -u 'user1'"
   assert_equal "$status" 2
-  assert_startwith "${errlines[0]}" "EXCEPTION: Missing or invalid REMOTE_NAMESPACE option, value 'umiami"
+  assert_startwith "${errlines[0]}" "EXCEPTION: Invalid REMOTE_NAMESPACE option"
 end
 #######################################
 : $((i++))
