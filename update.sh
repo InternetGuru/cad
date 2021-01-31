@@ -11,16 +11,16 @@ msg_start() {
   [[ $MSG_STATUS == 1 ]] \
     && exception "Message already started"
   MSG_STATUS=1
-  echo -n "$1 ... " >&2
+  printf -- "%s ... " "$@" >&2
 }
 msg_end() {
   [[ $MSG_STATUS == 0 ]] \
     && exception "Message not started"
   MSG_STATUS=0
-  echo "[ done ]" >&2
+  printf "[ done ]\n" >&2
 }
 confirm() {
-  echo -n "${1:-"Are you sure?"} [YES/No] " >&2
+  printf -- "%s [YES/No] " "${1:-"Are you sure?"}" >&2
   clear_stdin
   read -r
   [[ "$REPLY" =~ ^[Yy]([Ee][Ss])?$ || -z "$REPLY" ]] \
@@ -30,9 +30,9 @@ confirm() {
   confirm "Type"
 }
 prompt() {
-  echo -n "${1:-Enter value}: "
+  printf -- "%s: " "${1:-Enter value}" >&2
   clear_stdin
-  # do not echo output (e.g. for password)
+  # silent user input (e.g. for password)
   if [[ $2 == silent ]]; then
     read -rs
   else
@@ -44,7 +44,7 @@ prompt() {
 }
 set_dev_mode() {
   case "$1" in
-    always|never|auto)
+    "$ALWAYS"|"$NEVER"|"$AUTO")
       SET_DEVEL=$1
       return 0
     ;;
@@ -53,11 +53,11 @@ set_dev_mode() {
   return 2
 }
 exception() {
-  echo "EXCEPTION: ${1:-$SCRIPT_NAME Unknown exception}" >&2
+  printf -- "EXCEPTION: %s\n" "${1:-$SCRIPT_NAME Unknown exception}" >&2
   exit "${2:-1}"
 }
-format_usage() {
-  echo -e "$1" | fmt -w "$(tput cols)"
+print_usage() {
+  fmt -w "$(tput cols)" <<< "$USAGE"
 }
 check_command() {
   command -v "$1" >/dev/null 2>&1
@@ -72,7 +72,7 @@ git_current_branch() {
   local out
   out=$(git -C "${1:-.}" rev-parse --abbrev-ref HEAD) \
     || exception "$out"
-  echo "$out"
+  printf -- "%s\n" "$out"
 }
 git_same_commit() {
   [[ "$( git -C "${3:-.}" rev-parse "$1" )" == "$( git -C "${3:-.}" rev-parse "$2" )" ]]
@@ -129,6 +129,7 @@ git_fetch_all() {
     || exception "$out"
 }
 gitlab_api() {
+  local req response status output
   req="GET"
   [[ -n "$2" ]] \
     && req="POST"
@@ -136,14 +137,15 @@ gitlab_api() {
     --header "Authorization: Bearer $TOKEN" \
     --header "Content-Type: application/json" \
     --request $req --data "${2:-{\}}" "https://$GITLAB_URL/$1")
-  status=$(echo "$response" | sed -n '$p')
-  output=$(echo "$response" | sed '$d')
+  status=$(sed -n '$p' <<< "$response")
+  output=$(sed '$d' <<< "$response")
   [[ "$status" != 20* ]] \
-    && echo "$output" >&2 \
+    && printf -- "%s\n" "$output" >&2 \
     && exception "Invalid request $1 [$status]"
-  echo "$output"
+  printf -- "%s\n" "$output"
 }
 authorize() {
+  local username password
   [[ -s "$TOKEN_PATH" ]] \
     && return
   prompt "Username"
@@ -165,6 +167,7 @@ get_group_id() {
   gitlab_api "api/v4/groups/${1//\//%2F}" | jq .id
 }
 create_request() {
+  local project_id
   project_id=$(get_project_id "$1") \
     || exit 1
   gitlab_api "api/v4/projects/$project_id/merge_requests" \
@@ -172,6 +175,7 @@ create_request() {
     \"remove_source_branch\": \"false\", \"title\": \"Update from $SOURCE_BRANCH branch\"}" >/dev/null
 }
 create_project() {
+  local visibility
   visibility="public"
   [[ -n "$3" ]] \
     && visibility="private"
@@ -183,6 +187,7 @@ get_role() {
   gitlab_api "api/v4/projects/$1/members/all/$2" | jq -r '.access_level'
 }
 add_developer() {
+  local role
   [[ -z "$2" ]] \
     && return
   role=$(get_role "$1" "$2" 2>/dev/null)
@@ -201,6 +206,7 @@ get_user_id() {
     | jq -r '.[] | .id' | sed 's/null//'
 }
 create_ns() {
+  local parent_ns parent_id
   parent_ns=$(dirname "$1")
   [[ "$parent_ns" == . ]] \
     && exception "Root group $1 does not exist"
@@ -210,16 +216,17 @@ create_ns() {
   create_group "$(basename "$1")" "$parent_id"
 }
 init_user_repo() {
+  local user group_id project_ns project_folder user_id actual_remote_ns remote_url
   user="$1"
   group_id="$2"
   project_ns="$REMOTE_NS/$user"
   project_folder="$CACHE_FOLDER/$project_ns"
   if ! project_exists "$project_ns"; then
     user_id=""
-    [[ $SET_DEVEL == "never" ]] \
+    [[ $SET_DEVEL == "$NEVER" ]] \
       || user_id=$(get_user_id "$user") \
       || exit 1
-    [[ $SET_DEVEL == "always" && -z "$user_id" ]] \
+    [[ $SET_DEVEL == "$ALWAYS" && -z "$user_id" ]] \
       && exception "User $user does not exist"
     project_id=$(create_project "$group_id" "$user" "$user_id") \
       && add_developer "$project_id" "$user_id" \
@@ -252,6 +259,7 @@ init_user_repo() {
     || exception "Missing $SOURCE_BRANCH"
 }
 replace_readme() {
+  local project_ns project_folder main_branch
   project_ns="$1"
   project_folder="$2"
   main_branch="$3"
@@ -262,6 +270,7 @@ replace_readme() {
   sed -i "s~ref=$PROJECT_BRANCH~ref=$main_branch~g" "$project_folder/$README_FILE"
 }
 update_user_repo() {
+  local project_ns project_folder main_branch
   project_ns="$REMOTE_NS/$1"
   project_folder="$CACHE_FOLDER/$project_ns"
   # update from assignment
@@ -296,6 +305,7 @@ read_issues() {
     || exit 1
 }
 copy_issues() {
+  local i issue
   (( "$ISSUES_COUNT" < 0 )) \
     && read_issues
   for (( i=0; i < ISSUES_COUNT; i++ )); do
@@ -314,7 +324,6 @@ PROJECT_FOLDER="." # current folder
 USER_LIST=""
 README_FILE="README.md"
 README_REPLACE=0
-SET_DEVEL="auto"
 CACHE_FOLDER="$HOME/.cad_cache"
 GITLAB_URL="gitlab.com"
 TOKEN_FILE=".gitlab_access_token"
@@ -326,14 +335,16 @@ PROJECT_BRANCH=""
 ISSUES=""
 ISSUES_COUNT=-1
 MSG_STATUS=0
-
-## usage
-USAGE=$(format_usage "USAGE
+ALWAYS="always"
+NEVER="never"
+AUTO="auto"
+SET_DEVEL="$AUTO"
+USAGE="USAGE
       $SCRIPT_NAME -n REMOTE_NAMESPACE -u USER_LIST [-rh] [-f PROJECT_FOLDER]
 
 OPTIONS
       -d[MODE], --developer[=MODE]
-              Set developer rights to newly created projects 'always', 'never', or 'auto' (default).
+              Set developer rights to newly created projects '$ALWAYS', '$NEVER', or '$AUTO' (default).
 
       -f, --folder=PROJECT_FOLDER
               Path to project with the assignment, default current directory.
@@ -349,45 +360,42 @@ OPTIONS
 
       -u, --usernames=USER_LIST
               List of one or more solvers separated by space or newline, e.g. 'user1 user2'.
-")
+"
 
-## option preprocessing
-if ! LINE=$(
-  getopt -n "$0" \
-        -o d::f:hn:ru: \
-        -l developer::,folder:,help,namespace:,replace,usernames: \
-        -- "$@"
-)
-then
-  exit 1
-fi
-eval set -- "$LINE"
+# get options
+OPT=$(getopt -n "$0" \
+  -o d:f:hn:ru: \
+  -l developer:,folder:,help,namespace:,replace,usernames: \
+  -- "$@") \
+  && eval set -- "$OPT" \
+  || exit 1
 
-## load user options
+# process options
 while (( $# > 0 )); do
   case $1 in
     -d|--developer) shift; set_dev_mode "$1" || exit 2; shift ;;
     -f|--folder) shift; PROJECT_FOLDER="$1"; shift ;;
-    -h|--help) echo -e "$USAGE" && exit 0 ;;
+    -h|--help) print_usage && exit 0 ;;
     -n|--namespace) shift; REMOTE_NS="$1"; shift ;;
     -r|--replace) README_REPLACE=1; shift ;;
     -u|--usernames) shift; USER_LIST="$1"; shift ;;
     --) shift; break ;;
-    *-) echo "$0: Unrecognized option '$1'" >&2; exit 2 ;;
      *) break ;;
   esac
 done
 
-# parameter validation
+# validate options
+[[ -z "$REMOTE_NS" ]] \
+  && exception "Missing REMOTE_NAMESPACE option" 2
 [[ ! "$REMOTE_NS" =~ ^[a-z0-9]{2,}(/[a-z0-9]{2,}){2,}$ ]] \
-  && exception "Missing or invalid REMOTE_NAMESPACE option, value '$REMOTE_NS'" 2
-usernames=0
-for user in $USER_LIST; do
-  [[ ! "$user" =~ ^[a-z][a-z0-9_-]{4,}$ ]] \
-    && exception "Unsupported user format, value '$user'" 2
-  (( usernames++ ))
+  && exception "Invalid REMOTE_NAMESPACE option" 2
+USERNAMES=0
+for USER in $USER_LIST; do
+  [[ ! "$USER" =~ ^[a-z][a-z0-9_-]{4,}$ ]] \
+    && exception "Unsupported user format, value '$USER'" 2
+  (( USERNAMES++ ))
 done
-[[ $usernames == 0 ]] \
+[[ $USERNAMES == 0 ]] \
   && exception "Missing or empty USER_LIST option" 2
 
 # # redir stdin
@@ -423,16 +431,16 @@ fi
 msg_end
 
 msg_start "Processing namespace"
-group_id=$(get_group_id "$REMOTE_NS" 2>/dev/null) \
-  || group_id=$(create_ns "$REMOTE_NS") \
+GROUP_ID=$(get_group_id "$REMOTE_NS" 2>/dev/null) \
+  || GROUP_ID=$(create_ns "$REMOTE_NS") \
   || exit 1
 msg_end
 
 # process users
-for user in $USER_LIST; do
-  msg_start "Processing repository for $user"
-  init_user_repo "$user" "$group_id" \
-    && update_user_repo "$user" \
+for USER in $USER_LIST; do
+  msg_start "Processing repository for $USER"
+  init_user_repo "$USER" "$GROUP_ID" \
+    && update_user_repo "$USER" \
     || exit 1
   msg_end
 done
