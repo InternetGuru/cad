@@ -42,10 +42,10 @@ prompt() {
     && return 0
   prompt "$1"
 }
-set_dev_mode() {
+set_assign() {
   case "$1" in
     "$ALWAYS"|"$NEVER"|"$AUTO")
-      SET_DEVEL=$1
+      ASSIGN=$1
       return 0
     ;;
   esac
@@ -224,10 +224,10 @@ init_user_repo() {
   project_folder="$CACHE_FOLDER/$project_ns"
   if ! project_exists "$project_ns"; then
     user_id=""
-    [[ $SET_DEVEL == "$NEVER" ]] \
+    [[ $ASSIGN == "$NEVER" ]] \
       || user_id=$(get_user_id "$user") \
       || exit 1
-    [[ $SET_DEVEL == "$ALWAYS" && -z "$user_id" ]] \
+    [[ $ASSIGN == "$ALWAYS" && -z "$user_id" ]] \
       && exception "User $user does not exist"
     project_id=$(create_project "$group_id" "$user" "$user_id") \
       && add_developer "$project_id" "$user_id" \
@@ -342,13 +342,13 @@ MSG_STATUS=0
 ALWAYS="always"
 NEVER="never"
 AUTO="auto"
-SET_DEVEL="$AUTO"
+ASSIGN="$AUTO"
 USAGE="USAGE
-      $SCRIPT_NAME -n REMOTE_NAMESPACE -u USER_LIST [-rh] [-f PROJECT_FOLDER]
+      $SCRIPT_NAME -n REMOTE_NAMESPACE -u USER_LIST [-ahr] [-f PROJECT_FOLDER]
 
 OPTIONS
-      -d[MODE], --developer[=MODE]
-              Set developer rights to newly created projects '$ALWAYS', '$NEVER', or '$AUTO' (default).
+      -a[WHEN], --assign[=WHEN]
+              Assign ROLE (see below) to users for newly created projects and assign users to issues '$ALWAYS', '$NEVER', or '$AUTO' (default).
 
       -f, --folder=PROJECT_FOLDER
               Path to project with the assignment, default current directory.
@@ -368,8 +368,8 @@ OPTIONS
 
 # get options
 OPT=$(getopt -n "$0" \
-  -o d:f:hn:ru: \
-  -l developer:,folder:,help,namespace:,replace,usernames: \
+  -o a:f:hn:ru: \
+  -l assign:,folder:,help,namespace:,replace,usernames: \
   -- "$@") \
   && eval set -- "$OPT" \
   || exit 1
@@ -377,7 +377,7 @@ OPT=$(getopt -n "$0" \
 # process options
 while (( $# > 0 )); do
   case $1 in
-    -d|--developer) shift; set_dev_mode "$1" || exit 2; shift ;;
+    -a|--assign) shift; set_assign "$1" || exit 2; shift ;;
     -f|--folder) shift; PROJECT_FOLDER="$1"; shift ;;
     -h|--help) print_usage && exit 0 ;;
     -n|--namespace) shift; REMOTE_NS="$1"; shift ;;
