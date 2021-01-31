@@ -17,7 +17,7 @@ msg_end() {
   [[ $MSG_STATUS == 0 ]] \
     && exception "Message not started"
   MSG_STATUS=0
-  printf "[ done ]\n" >&2
+  printf -- "[ %s ]\n" "${1:-DONE}" >&2
 }
 confirm() {
   printf -- "%s [YES/No] " "${1:-"Are you sure?"}" >&2
@@ -323,9 +323,9 @@ copy_issues() {
 
 ## default global variables
 SCRIPT_NAME=$(basename "$0")
-REMOTE_NS=""
-PROJECT_FOLDER="." # current folder
-USER_LIST=""
+REMOTE_NS=$1
+PROJECT_FOLDER=$(readlink -f "${2:-.}")
+DRY_RUN=0
 README_FILE="README.md"
 README_REPLACE=0
 CACHE_FOLDER="$HOME/.cad_cache"
@@ -343,33 +343,27 @@ ALWAYS="always"
 NEVER="never"
 AUTO="auto"
 ASSIGN="$AUTO"
-USAGE="USAGE
-      $SCRIPT_NAME -n REMOTE_NAMESPACE -u USER_LIST [-ahr] [-f PROJECT_FOLDER]
+USAGE="DESCRIPTION
+      This script reads USERNAMES from stdin using IFS. For each USERNAME it distributes files from PROJECT_FOLDER into REMOTE_NAMESPACE/USERNAME. Root namespace in REMOTE_NAMESPACE must exist, meaning e.g. 'umiami' in 'umiami/csc220/fall20'.
+
+USAGE
+      $SCRIPT_NAME [-ahr] REMOTE_NAMESPACE [PROJECT_FOLDER]
 
 OPTIONS
       -a[WHEN], --assign[=WHEN]
               Assign ROLE (see below) to users for newly created projects and assign users to issues '$ALWAYS', '$NEVER', or '$AUTO' (default).
 
-      -f, --folder=PROJECT_FOLDER
-              Path to project with the assignment, default current directory.
-
       -h, --help
               Display usage.
 
-      -n, --namespace=REMOTE_NAMESPACE
-              GitLab root namespace, where root must exist, e.g. umiami/george/csc220/fall20
-
       -r, --replace
               Replace any occurrence of assignment project remote URL with user project remote URL in $README_FILE file.
-
-      -u, --usernames=USER_LIST
-              List of one or more solvers separated by space or newline, e.g. 'user1 user2'.
 "
 
 # get options
 OPT=$(getopt -n "$0" \
-  -o a:f:hn:ru: \
-  -l assign:,folder:,help,namespace:,replace,usernames: \
+  -o a:hr \
+  -l assign:,help,replace \
   -- "$@") \
   && eval set -- "$OPT" \
   || exit 1
@@ -378,29 +372,24 @@ OPT=$(getopt -n "$0" \
 while (( $# > 0 )); do
   case $1 in
     -a|--assign) shift; set_assign "$1" || exit 2; shift ;;
-    -f|--folder) shift; PROJECT_FOLDER="$1"; shift ;;
     -h|--help) print_usage && exit 0 ;;
-    -n|--namespace) shift; REMOTE_NS="$1"; shift ;;
     -r|--replace) README_REPLACE=1; shift ;;
-    -u|--usernames) shift; USER_LIST="$1"; shift ;;
     --) shift; break ;;
      *) break ;;
   esac
 done
 
-# validate options
+# validate
 [[ -z "$REMOTE_NS" ]] \
-  && exception "Missing REMOTE_NAMESPACE option" 2
-[[ ! "$REMOTE_NS" =~ ^[a-z0-9]{2,}(/[a-z0-9]{2,}){2,}$ ]] \
-  && exception "Invalid REMOTE_NAMESPACE option" 2
-USERNAMES=0
-for USER in $USER_LIST; do
-  [[ ! "$USER" =~ ^[a-z][a-z0-9_-]{4,}$ ]] \
-    && exception "Unsupported user format, value '$USER'" 2
-  (( USERNAMES++ ))
-done
-[[ $USERNAMES == 0 ]] \
-  && exception "Missing or empty USER_LIST option" 2
+  && exception "Missing argument REMOTE_NAMESPACE" 2
+[[ ! "$REMOTE_NS" =~ ^[a-z0-9]{2,}(/[a-z0-9]{2,})*$ ]] \
+  && exception "Invalid argument REMOTE_NAMESPACE" 2
+[[ -d "$PROJECT_FOLDER" ]] \
+  || exception "Project folder not found."
+[[ $README_REPLACE == 1 && ! -f "$PROJECT_FOLDER/$README_FILE" ]] \
+  && exception "Readme file not found."
+[[ -t 0 ]] \
+  && exception "Missing stdin"
 
 # # redir stdin
 # exec 3<&0
@@ -411,14 +400,6 @@ check_command "git" \
   || exception "Command git is required"
 check_command "jq" \
   || exception "Command jq is required"
-msg_end
-
-msg_start "Checking paths"
-PROJECT_FOLDER=$(readlink -f "$PROJECT_FOLDER")
-[[ -d "$PROJECT_FOLDER" ]] \
-  || exception "Project folder not found."
-[[ $README_REPLACE == 1 && ! -f "$PROJECT_FOLDER/$README_FILE" ]] \
-  && exception "Readme file not found."
 msg_end
 
 authorize \
@@ -441,10 +422,18 @@ GROUP_ID=$(get_group_id "$REMOTE_NS" 2>/dev/null) \
 msg_end
 
 # process users
-for USER in $USER_LIST; do
-  msg_start "Processing repository for $USER"
-  init_user_repo "$USER" "$GROUP_ID" \
-    && update_user_repo "$USER" \
-    || exit 1
-  msg_end
-done
+while read -r LINE; do
+  for USERNAME in $LINE; do
+    msg_start "Processing repository for $USERNAME"
+    [[ ! "$USERNAME" =~ ^[a-z][a-z0-9_-]{4,}$ ]] \
+      && msg_end UNSUPPORTED \
+      && continue
+    (( DRY_RUN == 1 )) \
+      && msg_end SKIPPED \
+      && continue
+    init_user_repo "$USERNAME" "$GROUP_ID" \
+      && update_user_repo "$USERNAME" \
+      || exit 1
+    msg_end
+  done
+done < "/dev/stdin"
