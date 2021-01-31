@@ -2,7 +2,7 @@
 
 i=0
 status=""
-ga="update.sh"
+ga="distribute.sh"
 
 #######################################
 ## Param validation
@@ -14,7 +14,7 @@ start "help"
   debug "$ga --help"
   assert_equal "$status" 0
   assert_startwith "${outlines[0]}" "USAGE"
-  assert_startwith "${outlines[1]}" "      update.sh -n REMOTE_NAMESPACE"
+  assert_startwith "${outlines[1]}" "      distribute.sh -n REMOTE_NAMESPACE"
 end
 #######################################
 : $((i++))

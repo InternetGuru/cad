@@ -4,7 +4,7 @@
 
 # Coding Assignment Distribution | CAD
 
-> The `update.sh` script distributes a source folder or a repository _(detaching its history)_ into one or more GitLab repositories (projects). To preserve the assignment's history, a separate `source` branch is used for pull requests into main branch when updated from the source using the same script. Additionally individual GitHub issues marked with an `assignment` label are copied into newly created repositories.
+> The `distribute.sh` script distributes a source folder or a repository _(detaching its history)_ into one or more GitLab repositories (projects). To preserve the assignment's history, a separate `source` branch is used for pull requests into main branch when updated from the source using the same script. Additionally individual GitHub issues marked with an `assignment` label are copied into newly created repositories.
 
 Newly created projects are public unless a matching GitLab user is found. In that case, the user gains developer rights and is assigned to created issues. Consequently the project's visibility is set to private.
 
@@ -24,7 +24,7 @@ Note: This project provides GitLab CI template (see below).
 
    ```
    git clone https://github.com/InternetGuru/cad.git
-   echo alias cad=\"$PWD/cad/update.sh\" >> ~/.bashrc
+   echo alias cad=\"$PWD/cad/distribute.sh\" >> ~/.bashrc
    source ~/.bashrc
    ```
 
@@ -32,7 +32,7 @@ Note: This project provides GitLab CI template (see below).
 
    ```
    sudo git clone https://github.com/InternetGuru/cad.git /usr/local/src
-   sudo ln -s "/usr/local/src/cad/update.sh" /usr/local/share/cad
+   sudo ln -s "/usr/local/src/cad/distribute.sh" /usr/local/share/cad
    ```
 
 ## CLI Usage
@@ -62,7 +62,7 @@ Note: This project provides GitLab CI template (see below).
 
    - E.g. [umiami/george/csc220/matrix@fall20](https://gitlab.com/umiami/george/csc220/matrix/-/tree/fall20)
 
-1. Add the following lines into your `.gitlab-ci.yml` file and insert users into `USERS` variable separated by space, e.g. `"solver1 solver2 solver3"`. You may want to select a different `update.sh` revision. Do not modify `CAD_REVISION` variable unless you know what you're doing.
+1. Add the following lines into your `.gitlab-ci.yml` file and insert users into `USERS` variable separated by space, e.g. `"solver1 solver2 solver3"`. You may want to select a different `distribute.sh` revision. Do not modify `CAD_REVISION` variable unless you know what you're doing.
 
    ```
    include: 'https://raw.githubusercontent.com/InternetGuru/cad/master/gitlab-distribute.yml'
