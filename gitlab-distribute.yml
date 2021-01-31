@@ -38,5 +38,5 @@ distribute:
     # set project remote for distribute.sh
     - git remote set-url origin "$namespace/$project_name.git"
     # distribute current project among all users
-    - $tmpcad/distribute.sh -r -n "$namespace/$branch/$project_name" -u "$USERS"
+    - $tmpcad/distribute.sh -r -n "$namespace/$branch/$project_name" -u "$CAD_USERS"
   when: manual

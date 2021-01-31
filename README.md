@@ -62,13 +62,13 @@ Note: This project provides GitLab CI template (see below).
 
    - E.g. [umiami/george/csc220/matrix@fall20](https://gitlab.com/umiami/george/csc220/matrix/-/tree/fall20)
 
-1. Add the following lines into your `.gitlab-ci.yml` file and insert users into `USERS` variable separated by space, e.g. `"solver1 solver2 solver3"`. You may want to select a different `distribute.sh` revision. Do not modify `CAD_REVISION` variable unless you know what you're doing.
+1. Add the following lines into your `.gitlab-ci.yml` file and insert users into `CAD_USERS` variable separated by space, e.g. `"solver1 solver2 solver3"`. You may want to select a different `distribute.sh` revision. Do not modify `CAD_REVISION` variable unless you know what you're doing.
 
    ```
    include: 'https://raw.githubusercontent.com/InternetGuru/cad/master/gitlab-distribute.yml'
 
    variables:
-     USERS: ""
+     CAD_USERS: ""
      CAD_REVISION: "1"
 
    stages:
