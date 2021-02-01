@@ -400,7 +400,7 @@ INVALID_USERNAME=0
 while read -r LINE; do
   for USERNAME in $LINE; do
     [[ ! "$USERNAME" =~ ^[a-z][a-z0-9_-]{4,}$ ]] \
-      && : "$(exception "Unsupported user format, value '$USERNAME'\n")" \
+      && : "$(exception "Unsupported user format, value '$USERNAME'")" \
       && INVALID_USERNAME=1
   done
 done
