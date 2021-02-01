@@ -43,14 +43,18 @@ prompt() {
   prompt "$1"
 }
 exception() {
-  printf -- "EXCEPTION: %s\n" "${1:-$SCRIPT_NAME Unknown exception}" >&2
+  printf -- "%s [ERR%d]\n" "${1:-$SCRIPT_NAME Unknown exception}" "${2:-1}" >&2
   exit "${2:-1}"
 }
 print_usage() {
   fmt -w "$(tput cols)" <<< "$USAGE"
 }
 check_command() {
-  command -v "$1" >/dev/null 2>&1
+  # shellcheck disable=SC2068
+  for cmd in $@; do
+    command -v "$cmd" >/dev/null 2>&1 \
+      || exception "Command $cmd not found."
+  done
 }
 git_repo_exists() {
   [[ -d "${1:-.}/.git" ]]
@@ -136,8 +140,6 @@ gitlab_api() {
 }
 authorize() {
   local username password
-  [[ -s "$TOKEN_PATH" ]] \
-    && return
   prompt "Username"
   username="$REPLY"
   prompt "Password" silent
@@ -145,7 +147,7 @@ authorize() {
   echo
   gitlab_api "oauth/token" \
     "{\"grant_type\":\"password\",\"username\":\"$username\",\"password\":\"$password\"}" \
-    | jq -r '.access_token' > "$TOKEN_PATH"
+    | jq -r '.access_token' > "$TOKEN_FILE"
 }
 get_project_id() {
   gitlab_api "api/v4/projects/${1//\//%2F}" | jq .id
@@ -207,19 +209,20 @@ create_ns() {
   create_group "$(basename "$1")" "$parent_id"
 }
 init_user_repo() {
-  local user group_id project_ns project_folder user_id actual_remote_ns remote_url
-  user="$1"
-  group_id="$2"
-  project_ns="$REMOTE_NS/$user"
-  project_folder="$CACHE_FOLDER/$project_ns"
+  declare -r project_ns="$REMOTE_NS/$1"
+  declare -r project_folder="$CACHE_FOLDER/$project_ns"
   if ! project_exists "$project_ns"; then
-    user_id=""
+    declare user_id=""
     [[ $ASSIGN == "$NEVER" ]] \
-      || user_id=$(get_user_id "$user") \
+      || user_id=$(get_user_id "$1") \
       || exit 1
     [[ $ASSIGN == "$ALWAYS" && -z "$user_id" ]] \
-      && exception "User $user does not exist"
-    project_id=$(create_project "$group_id" "$user" "$user_id") \
+      && exception "User $1 does not exist"
+    [[ -n $GROUP_ID ]] \
+      || GROUP_ID=$(get_group_id "$REMOTE_NS" 2>/dev/null) \
+      || GROUP_ID=$(create_ns "$REMOTE_NS") \
+      || exit 1
+    project_id=$(create_project "$GROUP_ID" "$1" "$user_id") \
       && add_developer "$project_id" "$user_id" \
       && copy_issues "$project_id" "$user_id" \
       || exit 1
@@ -227,6 +230,7 @@ init_user_repo() {
   fi
   if [[ -d "$project_folder" ]]; then
     # verify local remote
+    declare actual_remote_ns
     actual_remote_ns=$(get_remote_namespace "$project_folder") \
       || exit 1
     [[ "$actual_remote_ns" != "$project_ns" ]] \
@@ -235,7 +239,7 @@ init_user_repo() {
       || exit 1
   else
     # clone existing remote
-    remote_url="https://oauth2:$TOKEN@gitlab.com/$project_ns.git"
+    declare -r remote_url="https://oauth2:$TOKEN@$GITLAB_URL/$project_ns.git"
     git clone -q "$remote_url" "$project_folder" 2>/dev/null \
       || exception "Unable to clone user project $project_ns"
   fi
@@ -310,6 +314,66 @@ copy_issues() {
       || exit 1
   done
 }
+validate_arguments() {
+  msg_start "Validating arguments"
+  [[ -n "$REMOTE_NS" ]] \
+    || exception "Missing argument REMOTE_NAMESPACE" 2
+  [[ "$REMOTE_NS" =~ ^[a-z0-9]{2,}(/[a-z0-9]{2,})*$ ]] \
+    || exception "Invalid argument REMOTE_NAMESPACE" 2
+  [[ -d "$PROJECT_FOLDER" ]] \
+    || exception "Project folder not found."
+  [[ $ASSIGN =~ ^($ALWAYS|$NEVER|$AUTO)$ ]] \
+    || exception "Invalid option ASSIGN"
+  [[ $UPDATE_LINKS == 0 || -f "$PROJECT_FOLDER/$README_FILE" ]] \
+    || exception "Readme file not found."
+  [[ ! -t 0 ]] \
+    || exception "Missing stdin" 2
+  msg_end
+}
+read_project_info() {
+  msg_start "Getting project information"
+  [[ ! -d "$PROJECT_FOLDER/.git" ]] \
+    && msg_end SKIPPED \
+    && return
+  PROJECT_NS=$(get_remote_namespace "$PROJECT_FOLDER") \
+    && PROJECT_ID=$(get_project_id "$PROJECT_NS") \
+    && PROJECT_BRANCH=$(git_current_branch "$PROJECT_FOLDER") \
+    || exit 1
+  msg_end
+}
+acquire_token() {
+  [[ -s "$TOKEN_FILE" ]] \
+    || authorize \
+    || exception "Unable to authorize"
+  TOKEN=$(cat "$TOKEN_FILE") \
+    || exception "unable to read TOKEN_FILE"
+}
+process_users() {
+  declare username
+  declare -i valid=0
+  declare -i invalid=0
+  # shellcheck disable=SC2013
+  for username in $(cat); do
+    msg_start "Processing repository for $username"
+    [[ ! "$username" =~ ^[a-z][a-z0-9_-]{4,}$ ]] \
+      && msg_end INVALID \
+      && invalid+=1 \
+      && continue
+    valid+=1
+    [[ $DRY_RUN == 1 ]] \
+      && msg_end SKIPPED \
+      && continue
+    init_user_repo "$username" \
+      && update_user_repo "$username" \
+      || exit 1
+    msg_end
+  done
+
+  [[ $valid -eq 0 && $invalid -eq 0 ]] \
+    && exception "Empty or invalid stdin" 2
+  [[ $invalid -gt 0 ]] \
+    && exception "Invalid usernames: $invalid" 3
+}
 
 ## default global variables
 SCRIPT_NAME=$(basename "$0")
@@ -318,9 +382,9 @@ README_FILE="README.md"
 UPDATE_LINKS=0
 CACHE_FOLDER="$HOME/.cad_cache"
 GITLAB_URL="gitlab.com"
-TOKEN_FILE=".gitlab_access_token"
-TOKEN_PATH="$HOME/$TOKEN_FILE"
+declare -r TOKEN_FILE="$HOME/.gitlab_access_token"
 SOURCE_BRANCH="source"
+GROUP_ID=""
 PROJECT_NS=""
 PROJECT_ID=""
 PROJECT_BRANCH=""
@@ -371,67 +435,11 @@ while (( $# > 0 )); do
   esac
 done
 
-# set and validate arguments
+# validate and authorize
 REMOTE_NS=$1
 PROJECT_FOLDER=$(readlink -f "${2:-.}")
-[[ -n "$REMOTE_NS" ]] \
-  || exception "Missing argument REMOTE_NAMESPACE" 2
-[[ "$REMOTE_NS" =~ ^[a-z0-9]{2,}(/[a-z0-9]{2,})*$ ]] \
-  || exception "Invalid argument REMOTE_NAMESPACE" 2
-[[ -d "$PROJECT_FOLDER" ]] \
-  || exception "Project folder not found."
-[[ $ASSIGN =~ ^($ALWAYS|$NEVER|$AUTO)$ ]] \
-  || exception "Invalid option ASSIGN"
-[[ $UPDATE_LINKS == 0 || -f "$PROJECT_FOLDER/$README_FILE" ]] \
-  || exception "Readme file not found."
-[[ ! -t 0 ]] \
-  || exception "Missing stdin" 2
-
-# check environment and authorize
-check_command "git" \
-  || exception "Command git is required"
-check_command "jq" \
-  || exception "Command jq is required"
-authorize \
-  || exception "Unable to authorize"
-TOKEN=$(cat "$TOKEN_PATH")
-
-msg_start "Getting project information"
-if [[ -d "$PROJECT_FOLDER/.git" ]]; then
-  PROJECT_NS=$(get_remote_namespace "$PROJECT_FOLDER") \
-    && PROJECT_ID=$(get_project_id "$PROJECT_NS") \
-    && PROJECT_BRANCH=$(git_current_branch "$PROJECT_FOLDER") \
-    || exit 1
-fi
-msg_end
-
-msg_start "Processing namespace"
-GROUP_ID=$(get_group_id "$REMOTE_NS" 2>/dev/null) \
-  || GROUP_ID=$(create_ns "$REMOTE_NS") \
-  || exit 1
-msg_end
-
-# process users
-declare -i VALID=0
-declare -i INVALID=0
-# shellcheck disable=SC2013
-for USERNAME in $(cat); do
-  msg_start "Processing repository for $USERNAME"
-  [[ ! "$USERNAME" =~ ^[a-z][a-z0-9_-]{4,}$ ]] \
-    && msg_end UNSUPPORTED \
-    && INVALID+=1 \
-    && continue
-  VALID+=1
-  [[ $DRY_RUN == 1 ]] \
-    && msg_end SKIPPED \
-    && continue
-  init_user_repo "$USERNAME" "$GROUP_ID" \
-    && update_user_repo "$USERNAME" \
-    || exit 1
-  msg_end
-done
-
-[[ $VALID -eq 0 && $INVALID -eq 0 ]] \
-  && exception "Empty or invalid stdin" 2
-[[ $INVALID -gt 0 ]] \
-  && exception "Invalid usernames: $INVALID" 3
+validate_arguments
+check_command git jq
+acquire_token
+read_project_info
+process_users
