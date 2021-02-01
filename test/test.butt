@@ -32,16 +32,16 @@ start "missing users"
   assert_startwith "${errlines[0]}" "EXCEPTION: Missing stdin"
 end
 #######################################
-# : $((i++))
-# skip "invalid users"
-#   debug "echo 'a' | $ga '$correct_ns' '$tmp_project'"
-#   assert_equal "$status" 2
-#   assert_startwith "${errlines[0]}" "EXCEPTION: Unsupported user format, value 'a'"
-#   debug "echo 'aaaaaa
-#   b' | $ga '$correct_ns' '$tmp_project'"
-#   assert_equal "$status" 2
-#   assert_startwith "${errlines[0]}" "EXCEPTION: Unsupported user format, value 'b'"
-# end
+: $((i++))
+start "invalid users"
+  debug "echo 'a' | $ga '$correct_ns' '$tmp_project'"
+  assert_equal "$status" 3
+  assert_startwith "${errlines[0]}" "EXCEPTION: Unsupported user format, value 'a'"
+  debug "echo 'aaaaaa
+  b' | $ga '$correct_ns' '$tmp_project'"
+  assert_equal "$status" 3
+  assert_startwith "${errlines[0]}" "EXCEPTION: Unsupported user format, value 'b'"
+end
 #######################################
 : $((i++))
 start "invalid remote namespace format"

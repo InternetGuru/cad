@@ -395,6 +395,18 @@ PROJECT_FOLDER=$(readlink -f "${2:-.}")
 [[ ! -t 0 ]] \
   || exception "Missing stdin" 2
 
+# validate users from stdin
+INVALID_USERNAME=0
+while read -r LINE; do
+  for USERNAME in $LINE; do
+    [[ ! "$USERNAME" =~ ^[a-z][a-z0-9_-]{4,}$ ]] \
+      && : "$(exception "Unsupported user format, value '$USERNAME'\n")" \
+      && INVALID_USERNAME=1
+  done
+done
+[[ $INVALID_USERNAME == 1 ]] \
+  && exit 3
+
 # check environment and authorize
 check_command "git" \
   || exception "Command git is required"
@@ -423,9 +435,6 @@ msg_end
 while read -r LINE; do
   for USERNAME in $LINE; do
     msg_start "Processing repository for $USERNAME"
-    [[ ! "$USERNAME" =~ ^[a-z][a-z0-9_-]{4,}$ ]] \
-      && msg_end UNSUPPORTED \
-      && continue
     [[ $DRY_RUN == 1 ]] \
       && msg_end SKIPPED \
       && continue
@@ -434,4 +443,4 @@ while read -r LINE; do
       || exit 1
     msg_end
   done
-done < "/dev/stdin"
+done
