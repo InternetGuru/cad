@@ -260,10 +260,9 @@ init_user_repo() {
     || exception "Missing $SOURCE_BRANCH"
 }
 update_links() {
-  local project_ns project_folder main_branch
+  local project_ns main_branch
   project_ns="$1"
-  project_folder="$2"
-  project_readme="$project_folder/$README_FILE"
+  project_readme="$2/$README_FILE"
   main_branch="$3"
   sed -i "s~/$PROJECT_NS/~/$project_ns/~g" "$project_readme"
   [[ -z "$PROJECT_BRANCH" ]] \
