@@ -18,9 +18,13 @@ jobs:
       run: |
         curl -sL https://github.com/InternetGuru/butt/releases/download/v0.3.0/butt.sh > butt
         chmod +x butt
+    - name: Create token file
+      run: echo "$ACCESS_TOKEN" > "$HOME/.gitlab_access_token"
     - name: Add current dir into PATH
       run: pwd >> $GITHUB_PATH
     - name: Run tests
       run: butt -v test/test.butt
       env:
         TERM: dumb
+        ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+
