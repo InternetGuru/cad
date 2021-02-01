@@ -323,8 +323,6 @@ copy_issues() {
 
 ## default global variables
 SCRIPT_NAME=$(basename "$0")
-REMOTE_NS=$1
-PROJECT_FOLDER=$(readlink -f "${2:-.}")
 DRY_RUN=0
 README_FILE="README.md"
 UPDATE_LINKS=0
@@ -383,11 +381,13 @@ while (( $# > 0 )); do
   esac
 done
 
-# validate
-[[ -z "$REMOTE_NS" ]] \
-  && exception "Missing argument REMOTE_NAMESPACE" 2
-[[ ! "$REMOTE_NS" =~ ^[a-z0-9]{2,}(/[a-z0-9]{2,})*$ ]] \
-  && exception "Invalid argument REMOTE_NAMESPACE" 2
+# set and validate arguments
+REMOTE_NS=$1
+PROJECT_FOLDER=$(readlink -f "${2:-.}")
+[[ -n "$REMOTE_NS" ]] \
+  || exception "Missing argument REMOTE_NAMESPACE" 2
+[[ "$REMOTE_NS" =~ ^[a-z0-9]{2,}(/[a-z0-9]{2,})*$ ]] \
+  || exception "Invalid argument REMOTE_NAMESPACE" 2
 [[ -d "$PROJECT_FOLDER" ]] \
   || exception "Project folder not found."
 [[ $UPDATE_LINKS == 1 && ! -f "$PROJECT_FOLDER/$README_FILE" ]] \
