@@ -259,16 +259,16 @@ init_user_repo() {
   git_checkout "$SOURCE_BRANCH" "$project_folder" \
     || exception "Missing $SOURCE_BRANCH"
 }
-replace_readme() {
+update_links() {
   local project_ns project_folder main_branch
   project_ns="$1"
-  project_folder="$2"
+  project_readme="$project_folder/$README_FILE"
   main_branch="$3"
-  sed -i "s~/$PROJECT_NS/~/$project_ns/~g" "$project_folder/$README_FILE"
+  sed -i "s~/$PROJECT_NS/~/$project_ns/~g" "$project_readme"
   [[ -z "$PROJECT_BRANCH" ]] \
     && return
-  sed -i "s~/$PROJECT_BRANCH/\(pipeline\|raw\|file\)~/$main_branch/\1~g" "$project_folder/$README_FILE"
-  sed -i "s~ref=$PROJECT_BRANCH~ref=$main_branch~g" "$project_folder/$README_FILE"
+  sed -i "s~/$PROJECT_BRANCH/\(pipeline\|raw\|file\)~/$main_branch/\1~g" "$project_readme"
+  sed -i "s~ref=$PROJECT_BRANCH~ref=$main_branch~g" "$project_readme"
 }
 update_user_repo() {
   local project_ns project_folder main_branch project_id
@@ -278,8 +278,8 @@ update_user_repo() {
   rsync -a --delete --exclude .git/ "$PROJECT_FOLDER/" "$project_folder"
   # replace remote in readme file
   main_branch=$(git -C "$project_folder" remote show origin | grep "HEAD branch:" | tr -d " " | cut -d: -f2)
-  [[ $README_REPLACE == 1 ]] \
-    && replace_readme "$project_ns" "$project_folder" "$main_branch"
+  [[ $UPDATE_LINKS == 1 ]] \
+    && update_links "$project_ns" "$project_folder" "$main_branch"
   git_status_empty "$project_folder" \
     && return
   # commit
@@ -327,7 +327,7 @@ REMOTE_NS=$1
 PROJECT_FOLDER=$(readlink -f "${2:-.}")
 DRY_RUN=0
 README_FILE="README.md"
-README_REPLACE=0
+UPDATE_LINKS=0
 CACHE_FOLDER="$HOME/.cad_cache"
 GITLAB_URL="gitlab.com"
 TOKEN_FILE=".gitlab_access_token"
@@ -347,7 +347,7 @@ USAGE="DESCRIPTION
       This script reads USERNAMES from stdin using IFS. For each USERNAME it distributes files from PROJECT_FOLDER into REMOTE_NAMESPACE/USERNAME. Root namespace in REMOTE_NAMESPACE must exist, meaning e.g. 'umiami' in 'umiami/csc220/fall20'.
 
 USAGE
-      $SCRIPT_NAME [-ahr] REMOTE_NAMESPACE [PROJECT_FOLDER]
+      $SCRIPT_NAME [-ahl] REMOTE_NAMESPACE [PROJECT_FOLDER]
 
 OPTIONS
       -a[WHEN], --assign[=WHEN]
@@ -356,14 +356,14 @@ OPTIONS
       -h, --help
               Display usage.
 
-      -r, --replace
-              Replace any occurrence of assignment project remote URL with user project remote URL in $README_FILE file.
+      -l, --update-links
+              Replace all occurrences of the assignment project's remote URL and its current branch with user project's remote URL and its main branch in $README_FILE file.
 "
 
 # get options
 OPT=$(getopt -n "$0" \
-  -o a:hr \
-  -l assign:,help,replace \
+  -o a:hl \
+  -l assign:,help,update-links \
   -- "$@") \
   && eval set -- "$OPT" \
   || exit 1
@@ -373,7 +373,7 @@ while (( $# > 0 )); do
   case $1 in
     -a|--assign) shift; set_assign "$1" || exit 2; shift ;;
     -h|--help) print_usage && exit 0 ;;
-    -r|--replace) README_REPLACE=1; shift ;;
+    -l|--update-links) UPDATE_LINKS=1; shift ;;
     --) shift; break ;;
      *) break ;;
   esac
@@ -386,7 +386,7 @@ done
   && exception "Invalid argument REMOTE_NAMESPACE" 2
 [[ -d "$PROJECT_FOLDER" ]] \
   || exception "Project folder not found."
-[[ $README_REPLACE == 1 && ! -f "$PROJECT_FOLDER/$README_FILE" ]] \
+[[ $UPDATE_LINKS == 1 && ! -f "$PROJECT_FOLDER/$README_FILE" ]] \
   && exception "Readme file not found."
 [[ -t 0 ]] \
   && exception "Missing stdin"
