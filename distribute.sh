@@ -262,6 +262,7 @@ init_user_repo() {
 update_links() {
   local project_ns project_folder main_branch
   project_ns="$1"
+  project_folder="$2"
   project_readme="$project_folder/$README_FILE"
   main_branch="$3"
   sed -i "s~/$PROJECT_NS/~/$project_ns/~g" "$project_readme"
