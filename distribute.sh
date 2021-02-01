@@ -178,11 +178,11 @@ get_role() {
   gitlab_api "api/v4/projects/$1/members/all/$2" | jq -r '.access_level'
 }
 add_developer() {
-  local role
   [[ -z "$2" ]] \
     && return
+  local -i role
   role=$(get_role "$1" "$2" 2>/dev/null)
-  (( role >= 30 )) \
+  [[ role -ge 30 ]] \
     && return
   gitlab_api "api/v4/projects/$1/members" \
     "{\"access_level\":\"30\", \"user_id\":\"$2\"}" >/dev/null
@@ -300,7 +300,7 @@ read_issues() {
 }
 copy_issues() {
   local i issue
-  (( "$ISSUES_COUNT" < 0 )) \
+  [[ $ISSUES_COUNT -lt 0 ]] \
     && read_issues
   for (( i=0; i < ISSUES_COUNT; i++ )); do
     issue=$(jq ".[$i] | { title,description,due_date }" <<< "$ISSUES")
@@ -419,9 +419,9 @@ for USERNAME in $(cat); do
   msg_start "Processing repository for $USERNAME"
   [[ ! "$USERNAME" =~ ^[a-z][a-z0-9_-]{4,}$ ]] \
     && msg_end UNSUPPORTED \
-    && (( INVALID++ )) \
+    && INVALID+=1 \
     && continue
-  (( VALID++ ))
+  VALID+=1
   [[ $DRY_RUN == 1 ]] \
     && msg_end SKIPPED \
     && continue
