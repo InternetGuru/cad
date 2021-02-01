@@ -43,7 +43,7 @@ prompt() {
   prompt "$1"
 }
 exception() {
-  printf -- '%s [ERR%d]\n' "${1:-$SCRIPT_NAME Unknown exception.}" "${2:-1}" >&2
+  printf -- '%s [ EXIT#%d ]\n' "${1:-$SCRIPT_NAME Unknown exception.}" "${2:-1}" >&2
   exit "${2:-1}"
 }
 print_usage() {
@@ -426,6 +426,13 @@ OPTIONS
 
       -n, --dry-run
               Only process arguments, options and stdin validation. Would not proceed with create or update user repositories.
+
+EXIT CODES
+       1      Other error.
+
+       2      Invalid options or arguments including empty or missing stdin.
+
+       3      Some (or all) invalid users.
 "
 
 # get options
