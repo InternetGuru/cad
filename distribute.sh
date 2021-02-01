@@ -64,7 +64,7 @@ git_local_branch_exists() {
 }
 git_current_branch() {
   declare out
-  out=$(git -C "${1:-.}" rev-parse --abbrev-ref HEAD) \
+  out="$(git -C "${1:-.}" rev-parse --abbrev-ref HEAD)" \
     || exception "$out"
   printf -- '%s\n' "$out"
 }
@@ -73,18 +73,18 @@ git_same_commit() {
 }
 git_init() {
   declare out
-  out=$(git -C "${1:-.}" init 2>&1) \
+  out="$(git -C "${1:-.}" init 2>&1)" \
     || exception "$out"
 }
 git_add_all() {
   declare out
-  out=$(git -C "${1:-.}" add -A 2>&1) \
+  out="$(git -C "${1:-.}" add -A 2>&1)" \
     || exception "$out"
 }
 git_checkout() {
   declare out
   # shellcheck disable=SC2086
-  out=$(git -C "${2:-.}" checkout $1 2>&1) \
+  out="$(git -C "${2:-.}" checkout $1 2>&1)" \
     || exception "$out"
 }
 git_status_empty() {
@@ -96,30 +96,30 @@ git_remote_exists() {
 git_pull() {
   declare out
   # shellcheck disable=SC2086
-  out=$(git -C "${1:-.}" pull $2 2>&1) \
+  out="$(git -C "${1:-.}" pull $2 2>&1)" \
     || exception "$out"
 }
 git_merge() {
   declare out
   # shellcheck disable=SC2086
-  out=$(git -C "${2:-.}" merge $1 2>&1) \
+  out="$(git -C "${2:-.}" merge $1 2>&1)" \
     || exception "$out"
 }
 git_push() {
   declare out
   # shellcheck disable=SC2086
-  out=$(git -C "${2:-.}" push $1 2>&1) \
+  out="$(git -C "${2:-.}" push $1 2>&1)" \
     || exception "$out"
 }
 git_commit() {
   declare out
   # shellcheck disable=SC2086
-  out=$(git -C "${2:-.}" commit $3 -m "$1" 2>&1) \
+  out="$(git -C "${2:-.}" commit $3 -m "$1" 2>&1)" \
     || exception "$out"
 }
 git_fetch_all() {
   declare out
-  out=$(git -C "${1:-.}" fetch --all 2>&1) \
+  out="$(git -C "${1:-.}" fetch --all 2>&1)" \
     || exception "$out"
 }
 gitlab_api() {
@@ -127,14 +127,14 @@ gitlab_api() {
   [[ -n "$2" ]] \
     && req='POST'
   # shellcheck disable=SC2155
-  declare response=$(curl --silent --write-out '\n%{http_code}\n' \
+  declare response="$(curl --silent --write-out '\n%{http_code}\n' \
     --header "Authorization: Bearer $TOKEN" \
     --header 'Content-Type: application/json' \
-    --request $req --data "${2:-{\}}" "https://$GITLAB_URL/$1")
+    --request $req --data "${2:-{\}}" "https://$GITLAB_URL/$1")"
   # shellcheck disable=SC2155
-  declare status=$(sed -n '$p' <<< "$response")
+  declare status="$(sed -n '$p' <<< "$response")"
   # shellcheck disable=SC2155
-  declare output=$(sed '$d' <<< "$response")
+  declare output="$(sed '$d' <<< "$response")"
   [[ "$status" != "20*" ]] \
     && printf -- '%s\n' "$output" >&2 \
     && exception "Request status $status: $1"
@@ -186,7 +186,7 @@ add_developer() {
   [[ -z "$2" ]] \
     && return
   # shellcheck disable=SC2155
-  declare -ir role=$(get_role "$1" "$2" 2>/dev/null)
+  declare -ir role="$(get_role "$1" "$2" 2>/dev/null)"
   [[ $role -ge 30 ]] \
     && return
   gitlab_api "api/v4/projects/$1/members" \
@@ -203,12 +203,12 @@ get_user_id() {
 }
 create_ns() {
   # shellcheck disable=SC2155
-  declare -r parent_ns=$(dirname "$1")
+  declare -r parent_ns="$(dirname "$1")"
   [[ "$parent_ns" == '.' ]] \
     && exception "Root group $1 does not exist."
   declare parent_id
-  parent_id=$(get_group_id "$parent_ns" 2>/dev/null) \
-    || parent_id=$(create_ns "$parent_ns") \
+  parent_id="$(get_group_id "$parent_ns" 2>/dev/null)" \
+    || parent_id="$(create_ns "$parent_ns")" \
     || exit 1
   create_group "$(basename "$1")" "$parent_id"
 }
@@ -216,17 +216,17 @@ init_user_repo() {
   declare -r project_ns="$REMOTE_NS/$1"
   declare -r project_folder="$CACHE_FOLDER/$project_ns"
   if ! project_exists "$project_ns"; then
-    declare user_id=""
+    declare user_id=''
     [[ "$ASSIGN" == "$NEVER" ]] \
-      || user_id=$(get_user_id "$1") \
+      || user_id="$(get_user_id "$1")" \
       || exit 1
     [[ "$ASSIGN" == "$ALWAYS" && -z "$user_id" ]] \
       && exception "User $1 does not exist."
     [[ -n "$GROUP_ID" ]] \
-      || GROUP_ID=$(get_group_id "$REMOTE_NS" 2>/dev/null) \
-      || GROUP_ID=$(create_ns "$REMOTE_NS") \
+      || GROUP_ID="$(get_group_id "$REMOTE_NS" 2>/dev/null)" \
+      || GROUP_ID="$(create_ns "$REMOTE_NS")" \
       || exit 1
-    project_id=$(create_project "$GROUP_ID" "$1" "$user_id") \
+    project_id="$(create_project "$GROUP_ID" "$1" "$user_id")" \
       && add_developer "$project_id" "$user_id" \
       && copy_issues "$project_id" "$user_id" \
       || exit 1
@@ -235,7 +235,7 @@ init_user_repo() {
   if [[ -d "$project_folder" ]]; then
     # verify local remote
     declare actual_remote_ns
-    actual_remote_ns=$(get_remote_namespace "$project_folder") \
+    actual_remote_ns="$(get_remote_namespace "$project_folder")" \
       || exit 1
     [[ "$actual_remote_ns" != "$project_ns" ]] \
       && exception 'Invalid user project remote origin url.'
@@ -271,7 +271,7 @@ update_user_repo() {
   declare -r project_ns="$REMOTE_NS/$1"
   declare -r project_folder="$CACHE_FOLDER/$project_ns"
   declare main_branch
-  main_branch=$(get_project_branch "project_ns") \
+  main_branch="$(get_project_branch "project_ns")" \
     || exit 1
   # update from assignment
   rsync -a --delete --exclude .git/ "$PROJECT_FOLDER/" "$project_folder"
@@ -290,7 +290,7 @@ update_user_repo() {
   git_same_commit "$main_branch" "$SOURCE_BRANCH" "$project_folder" \
     && return
   declare project_id
-  project_id=$(get_project_id "$project_ns") \
+  project_id="$(get_project_id "$project_ns")" \
     || exit 1
   request_exists "$project_id" \
     || create_request "$project_id"
@@ -303,8 +303,8 @@ read_issues() {
   [[ -z "$PROJECT_ID" ]] \
     && ISSUES_COUNT=0 \
     && return
-  ISSUES=$(gitlab_api "api/v4/projects/$PROJECT_ID/issues?labels=assignment") \
-    && ISSUES_COUNT=$(jq length <<< "$ISSUES") \
+  ISSUES="$(gitlab_api "api/v4/projects/$PROJECT_ID/issues?labels=assignment")" \
+    && ISSUES_COUNT="$(jq length <<< "$ISSUES")" \
     || exit 1
 }
 copy_issues() {
@@ -312,9 +312,9 @@ copy_issues() {
     && read_issues
   declare i issue
   for (( i=0; i < ISSUES_COUNT; i++ )); do
-    issue=$(jq ".[$i] | {title, description, due_date}" <<< "$ISSUES")
+    issue="$(jq ".[$i] | {title, description, due_date}" <<< "$ISSUES")"
     [[ -n "$2" ]] \
-      && issue=$(jq --arg a "$2" '. + {assignee_ids:[$a]}' <<< "$issue")
+      && issue="$(jq --arg a "$2" '. + {assignee_ids:[$a]}' <<< "$issue")"
     gitlab_api "api/v4/projects/$1/issues" "$issue" >/dev/null \
       || exit 1
   done
@@ -340,9 +340,9 @@ read_project_info() {
   [[ ! -d "$PROJECT_FOLDER/.git" ]] \
     && msg_end SKIPPED \
     && return
-  PROJECT_NS=$(get_remote_namespace "$PROJECT_FOLDER") \
-    && PROJECT_ID=$(get_project_id "$PROJECT_NS") \
-    && PROJECT_BRANCH=$(git_current_branch "$PROJECT_FOLDER") \
+  PROJECT_NS="$(get_remote_namespace "$PROJECT_FOLDER")" \
+    && PROJECT_ID="$(get_project_id "$PROJECT_NS")" \
+    && PROJECT_BRANCH="$(git_current_branch "$PROJECT_FOLDER")" \
     || exit 1
   msg_end
 }
@@ -350,7 +350,7 @@ acquire_token() {
   [[ -s "$TOKEN_FILE" ]] \
     || authorize \
     || exception 'Unable to authorize.'
-  TOKEN=$(cat "$TOKEN_FILE") \
+  TOKEN="$(cat "$TOKEN_FILE")" \
     || exception 'Unable to read TOKEN_FILE.'
 }
 process_users() {
@@ -379,11 +379,11 @@ process_users() {
     && exception "Invalid username occured $invalid time(s)." 3
 }
 
-# default global constants
-declare -r TOKEN_FILE="$HOME/.gitlab_access_token"
-declare -r CACHE_FOLDER="$HOME/.cad_cache"
+# global constants
 # shellcheck disable=SC2155
 declare -r SCRIPT_NAME="$(basename "$0")"
+declare -r TOKEN_FILE="$HOME/.gitlab_access_token"
+declare -r CACHE_FOLDER="$HOME/.cad_cache"
 declare -r README_FILE='README.md'
 declare -r GITLAB_URL='gitlab.com'
 declare -r SOURCE_BRANCH='source'
@@ -392,15 +392,16 @@ declare -r NEVER='never'
 declare -r AUTO='auto'
 
 # default variables
+declare DIRECTORY='.'
 declare DRY_RUN='false'
 declare UPDATE_LINKS='false'
 declare MSG_OPENED='false'
 declare ASSIGN="$AUTO"
-declare GROUP_ID=""
-declare PROJECT_NS=""
-declare PROJECT_ID=""
-declare PROJECT_BRANCH=""
-declare ISSUES=""
+declare GROUP_ID=''
+declare PROJECT_NS=''
+declare PROJECT_ID=''
+declare PROJECT_BRANCH=''
+declare ISSUES=''
 declare -i ISSUES_COUNT=-1
 
 # USAGE
@@ -408,11 +409,14 @@ declare -r USAGE="DESCRIPTION
       This script reads USERNAMES from stdin using IFS. For each USERNAME it distributes files from PROJECT_FOLDER into REMOTE_NAMESPACE/USERNAME. Root namespace in REMOTE_NAMESPACE must exist, meaning e.g. 'umiami' in 'umiami/csc220/fall20'.
 
 USAGE
-      $SCRIPT_NAME [-ahln] REMOTE_NAMESPACE [PROJECT_FOLDER]
+      $SCRIPT_NAME [-adhln] REMOTE_NAMESPACE
 
 OPTIONS
       -a[WHEN], --assign[=WHEN]
               Assign ROLE (see below) to users for newly created projects and assign users to issues '$ALWAYS', '$NEVER', or '$AUTO' (default).
+
+      -d, --directory
+              Specify the PROJECT_FOLDER (default PWD).
 
       -h, --help
               Display usage.
@@ -426,14 +430,17 @@ OPTIONS
 
 # get options
 declare OPT
-OPT=$(getopt -n "$0" -o a:hln -l assign:,help,update-links,dry-run -- "$@") \
+OPT="$(getopt --name "$0" --options 'a:d:hln' \
+  --longoptions 'assign:,directory:,help,update-links,dry-run' \
+  -- "$@")" \
   && eval set -- "$OPT" \
   || exit 1
 
 # process options
 while (( $# > 0 )); do
   case $1 in
-    -a|--assign) shift; ASSIGN=$1; shift ;;
+    -a|--assign) shift; ASSIGN="$1"; shift ;;
+    -d|--directory) shift; DIRECTORY="$1"; shift ;;
     -h|--help) print_usage && exit 0 ;;
     -l|--update-links) UPDATE_LINKS='true'; shift ;;
     -n|--dry-run) DRY_RUN='true'; shift ;;
@@ -445,7 +452,7 @@ done
 # validate and authorize
 declare -r REMOTE_NS="$1"
 # shellcheck disable=SC2155
-declare -r PROJECT_FOLDER=$(readlink -f "${2:-.}")
+declare -r PROJECT_FOLDER="$(readlink -f "$DIRECTORY")"
 validate_arguments
 check_command git jq
 acquire_token
