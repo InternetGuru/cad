@@ -42,16 +42,6 @@ prompt() {
     && return 0
   prompt "$1"
 }
-set_assign() {
-  case "$1" in
-    "$ALWAYS"|"$NEVER"|"$AUTO")
-      ASSIGN=$1
-      return 0
-    ;;
-  esac
-  exception "Invalid parameter -d value" 2
-  return 2
-}
 exception() {
   printf -- "EXCEPTION: %s\n" "${1:-$SCRIPT_NAME Unknown exception}" >&2
   exit "${2:-1}"
@@ -335,7 +325,7 @@ PROJECT_NS=""
 PROJECT_ID=""
 PROJECT_BRANCH=""
 ISSUES=""
-ISSUES_COUNT=-1
+declare -i ISSUES_COUNT=-1
 MSG_STATUS=0
 ALWAYS="always"
 NEVER="never"
@@ -372,7 +362,7 @@ OPT=$(getopt -n "$0" \
 # process options
 while (( $# > 0 )); do
   case $1 in
-    -a|--assign) shift; set_assign "$1" || exit 2; shift ;;
+    -a|--assign) shift; ASSIGN=$1; shift ;;
     -h|--help) print_usage && exit 0 ;;
     -l|--update-links) UPDATE_LINKS=1; shift ;;
     -n|--dry-run) DRY_RUN=1; shift ;;
@@ -390,6 +380,8 @@ PROJECT_FOLDER=$(readlink -f "${2:-.}")
   || exception "Invalid argument REMOTE_NAMESPACE" 2
 [[ -d "$PROJECT_FOLDER" ]] \
   || exception "Project folder not found."
+[[ $ASSIGN =~ ^($ALWAYS|$NEVER|$AUTO)$ ]] \
+  || exception "Invalid option ASSIGN"
 [[ $UPDATE_LINKS == 0 || -f "$PROJECT_FOLDER/$README_FILE" ]] \
   || exception "Readme file not found."
 [[ ! -t 0 ]] \
@@ -420,18 +412,26 @@ GROUP_ID=$(get_group_id "$REMOTE_NS" 2>/dev/null) \
 msg_end
 
 # process users
-while read -r LINE; do
-  for USERNAME in $LINE; do
-    msg_start "Processing repository for $USERNAME"
-    [[ ! "$USERNAME" =~ ^[a-z][a-z0-9_-]{4,}$ ]] \
-      && msg_end UNSUPPORTED \
-      && continue
-    [[ $DRY_RUN == 1 ]] \
-      && msg_end SKIPPED \
-      && continue
-    init_user_repo "$USERNAME" "$GROUP_ID" \
-      && update_user_repo "$USERNAME" \
-      || exit 1
-    msg_end
-  done
-done < "/dev/stdin"
+declare -i VALID=0
+declare -i INVALID=0
+# shellcheck disable=SC2013
+for USERNAME in $(cat); do
+  msg_start "Processing repository for $USERNAME"
+  [[ ! "$USERNAME" =~ ^[a-z][a-z0-9_-]{4,}$ ]] \
+    && msg_end UNSUPPORTED \
+    && (( INVALID++ )) \
+    && continue
+  (( VALID++ ))
+  [[ $DRY_RUN == 1 ]] \
+    && msg_end SKIPPED \
+    && continue
+  init_user_repo "$USERNAME" "$GROUP_ID" \
+    && update_user_repo "$USERNAME" \
+    || exit 1
+  msg_end
+done
+
+[[ $VALID -eq 0 && $INVALID -eq 0 ]] \
+  && exception "Empty or invalid stdin" 2
+[[ $INVALID -gt 0 ]] \
+  && exception "Invalid usernames: $INVALID" 3
