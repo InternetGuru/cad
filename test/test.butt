@@ -1,66 +1,67 @@
 #!/bin/bash
 
 i=0
-status=""
-ga="update.sh"
+status=
+ga=./distribute.sh
+tmp_project=$(mktemp -d)
 
 #######################################
 ## Param validation
 #######################################
-correct_ns="umiami/test/csc220"
+correct_ns="umiami"
 #######################################
 : $((i++))
 start "help"
   debug "$ga --help"
   assert_equal "$status" 0
-  assert_startwith "${outlines[0]}" "USAGE"
-  assert_startwith "${outlines[1]}" "      update.sh -n REMOTE_NAMESPACE"
+  assert_startwith "${outlines[0]}" "DESCRIPTION"
+  assert_startwith "${outlines[1]}" "      This script reads USERNAMES from stdin using IFS."
 end
 #######################################
 : $((i++))
-start "missing -n"
-  debug "$ga -u 'user1'"
+start "missing remote namespace"
+  debug "echo 'user1' | $ga"
   assert_equal "$status" 2
-  assert_startwith "${errlines[0]}" "EXCEPTION: Missing REMOTE_NAMESPACE option"
+  assert_startwith "${errlines[0]}" "EXCEPTION: Missing argument REMOTE_NAMESPACE"
 end
 #######################################
 : $((i++))
-start "missing -u"
-  debug "$ga -n '$correct_ns'"
+start "missing users"
+  debug "$ga '$correct_ns'"
   assert_equal "$status" 2
-  assert_startwith "${errlines[0]}" "EXCEPTION: Missing or empty USER_LIST option"
+  assert_startwith "${errlines[0]}" "EXCEPTION: Missing stdin"
+end
+#######################################
+# : $((i++))
+# skip "invalid users"
+#   debug "echo 'a' | $ga '$correct_ns' '$tmp_project'"
+#   assert_equal "$status" 2
+#   assert_startwith "${errlines[0]}" "EXCEPTION: Unsupported user format, value 'a'"
+#   debug "echo 'aaaaaa
+#   b' | $ga '$correct_ns' '$tmp_project'"
+#   assert_equal "$status" 2
+#   assert_startwith "${errlines[0]}" "EXCEPTION: Unsupported user format, value 'b'"
+# end
+#######################################
+: $((i++))
+start "invalid remote namespace format"
+  debug "echo 'user1' | $ga '1' '$tmp_project'"
+  assert_equal "$status" 2
+  assert_startwith "${errlines[0]}" "EXCEPTION: Invalid argument REMOTE_NAMESPACE"
 end
 #######################################
 : $((i++))
-start "invalid -u"
-  debug "$ga -n '$correct_ns' -u 'a'"
-  assert_equal "$status" 2
-  assert_startwith "${errlines[0]}" "EXCEPTION: Unsupported user format, value 'a'"
-  debug "$ga -n '$correct_ns' -u 'aaaaaa
-  b'"
-  assert_equal "$status" 2
-  assert_startwith "${errlines[0]}" "EXCEPTION: Unsupported user format, value 'b'"
-end
-#######################################
-: $((i++))
-start "-n invalid format"
-  debug "$ga -n 'umiami' -u 'user1'"
-  assert_equal "$status" 2
-  assert_startwith "${errlines[0]}" "EXCEPTION: Invalid REMOTE_NAMESPACE option"
-end
-#######################################
-: $((i++))
-start "-u invalid format"
-  debug "$ga -n '$correct_ns' -u 'user1 a'"
-  assert_equal "$status" 2
-  assert_startwith "${errlines[0]}" "EXCEPTION: Unsupported user format, value 'a'"
-end
-#######################################
-: $((i++))
-start "-f invalid path"
-  debug "$ga -n '$correct_ns' -u 'user1' -f '/foo'"
+start "missing root namespace"
+  debug "echo 'user1' | $ga 'xyz123xyz' '$tmp_project'"
   assert_equal "$status" 1
-  assert_startwith "${errlines[1]}" "Checking paths ... EXCEPTION: Project folder not found."
+  assert_startwith "${errlines[1]}" "Processing namespace ... EXCEPTION: Root group xyz123xyz does not exist"
+end
+#######################################
+: $((i++))
+start "invalid project path"
+  debug "echo 'user1' | $ga '$correct_ns' '/foo'"
+  assert_equal "$status" 1
+  assert_startwith "${errlines[0]}" "EXCEPTION: Project folder not found."
 end
 #######################################
 ## Requirements
@@ -70,3 +71,5 @@ skip "missing jq"
 : $((i++))
 skip "missing git"
 #######################################
+
+rmdir "$tmp_project"

@@ -17,7 +17,7 @@ msg_end() {
   [[ $MSG_STATUS == 0 ]] \
     && exception "Message not started"
   MSG_STATUS=0
-  printf "[ done ]\n" >&2
+  printf -- "[ %s ]\n" "${1:-DONE}" >&2
 }
 confirm() {
   printf -- "%s [YES/No] " "${1:-"Are you sure?"}" >&2
@@ -42,10 +42,10 @@ prompt() {
     && return 0
   prompt "$1"
 }
-set_dev_mode() {
+set_assign() {
   case "$1" in
     "$ALWAYS"|"$NEVER"|"$AUTO")
-      SET_DEVEL=$1
+      ASSIGN=$1
       return 0
     ;;
   esac
@@ -224,10 +224,10 @@ init_user_repo() {
   project_folder="$CACHE_FOLDER/$project_ns"
   if ! project_exists "$project_ns"; then
     user_id=""
-    [[ $SET_DEVEL == "$NEVER" ]] \
+    [[ $ASSIGN == "$NEVER" ]] \
       || user_id=$(get_user_id "$user") \
       || exit 1
-    [[ $SET_DEVEL == "$ALWAYS" && -z "$user_id" ]] \
+    [[ $ASSIGN == "$ALWAYS" && -z "$user_id" ]] \
       && exception "User $user does not exist"
     project_id=$(create_project "$group_id" "$user" "$user_id") \
       && add_developer "$project_id" "$user_id" \
@@ -259,16 +259,16 @@ init_user_repo() {
   git_checkout "$SOURCE_BRANCH" "$project_folder" \
     || exception "Missing $SOURCE_BRANCH"
 }
-replace_readme() {
-  local project_ns project_folder main_branch
+update_links() {
+  local project_ns main_branch
   project_ns="$1"
-  project_folder="$2"
+  project_readme="$2/$README_FILE"
   main_branch="$3"
-  sed -i "s~/$PROJECT_NS/~/$project_ns/~g" "$project_folder/$README_FILE"
+  sed -i "s~/$PROJECT_NS/~/$project_ns/~g" "$project_readme"
   [[ -z "$PROJECT_BRANCH" ]] \
     && return
-  sed -i "s~/$PROJECT_BRANCH/\(pipeline\|raw\|file\)~/$main_branch/\1~g" "$project_folder/$README_FILE"
-  sed -i "s~ref=$PROJECT_BRANCH~ref=$main_branch~g" "$project_folder/$README_FILE"
+  sed -i "s~/$PROJECT_BRANCH/\(pipeline\|raw\|file\)~/$main_branch/\1~g" "$project_readme"
+  sed -i "s~ref=$PROJECT_BRANCH~ref=$main_branch~g" "$project_readme"
 }
 update_user_repo() {
   local project_ns project_folder main_branch project_id
@@ -278,8 +278,8 @@ update_user_repo() {
   rsync -a --delete --exclude .git/ "$PROJECT_FOLDER/" "$project_folder"
   # replace remote in readme file
   main_branch=$(git -C "$project_folder" remote show origin | grep "HEAD branch:" | tr -d " " | cut -d: -f2)
-  [[ $README_REPLACE == 1 ]] \
-    && replace_readme "$project_ns" "$project_folder" "$main_branch"
+  [[ $UPDATE_LINKS == 1 ]] \
+    && update_links "$project_ns" "$project_folder" "$main_branch"
   git_status_empty "$project_folder" \
     && return
   # commit
@@ -323,11 +323,9 @@ copy_issues() {
 
 ## default global variables
 SCRIPT_NAME=$(basename "$0")
-REMOTE_NS=""
-PROJECT_FOLDER="." # current folder
-USER_LIST=""
+DRY_RUN=0
 README_FILE="README.md"
-README_REPLACE=0
+UPDATE_LINKS=0
 CACHE_FOLDER="$HOME/.cad_cache"
 GITLAB_URL="gitlab.com"
 TOKEN_FILE=".gitlab_access_token"
@@ -342,34 +340,31 @@ MSG_STATUS=0
 ALWAYS="always"
 NEVER="never"
 AUTO="auto"
-SET_DEVEL="$AUTO"
-USAGE="USAGE
-      $SCRIPT_NAME -n REMOTE_NAMESPACE -u USER_LIST [-rh] [-f PROJECT_FOLDER]
+ASSIGN="$AUTO"
+USAGE="DESCRIPTION
+      This script reads USERNAMES from stdin using IFS. For each USERNAME it distributes files from PROJECT_FOLDER into REMOTE_NAMESPACE/USERNAME. Root namespace in REMOTE_NAMESPACE must exist, meaning e.g. 'umiami' in 'umiami/csc220/fall20'.
+
+USAGE
+      $SCRIPT_NAME [-ahln] REMOTE_NAMESPACE [PROJECT_FOLDER]
 
 OPTIONS
-      -d[MODE], --developer[=MODE]
-              Set developer rights to newly created projects '$ALWAYS', '$NEVER', or '$AUTO' (default).
-
-      -f, --folder=PROJECT_FOLDER
-              Path to project with the assignment, default current directory.
+      -a[WHEN], --assign[=WHEN]
+              Assign ROLE (see below) to users for newly created projects and assign users to issues '$ALWAYS', '$NEVER', or '$AUTO' (default).
 
       -h, --help
               Display usage.
 
-      -n, --namespace=REMOTE_NAMESPACE
-              GitLab root namespace, where root must exist, e.g. umiami/george/csc220/fall20
+      -l, --update-links
+              Replace all occurrences of the assignment project's remote URL and its current branch with user project's remote URL and its main branch in $README_FILE file.
 
-      -r, --replace
-              Replace any occurrence of assignment project remote URL with user project remote URL in $README_FILE file.
-
-      -u, --usernames=USER_LIST
-              List of one or more solvers separated by space or newline, e.g. 'user1 user2'.
+      -n, --dry-run
+              Only process arguments, options and stdin validation. Would not proceed with create or update user repositories.
 "
 
 # get options
 OPT=$(getopt -n "$0" \
-  -o d:f:hn:ru: \
-  -l developer:,folder:,help,namespace:,replace,usernames: \
+  -o a:hln \
+  -l assign:,help,update-links,dry-run \
   -- "$@") \
   && eval set -- "$OPT" \
   || exit 1
@@ -377,50 +372,34 @@ OPT=$(getopt -n "$0" \
 # process options
 while (( $# > 0 )); do
   case $1 in
-    -d|--developer) shift; set_dev_mode "$1" || exit 2; shift ;;
-    -f|--folder) shift; PROJECT_FOLDER="$1"; shift ;;
+    -a|--assign) shift; set_assign "$1" || exit 2; shift ;;
     -h|--help) print_usage && exit 0 ;;
-    -n|--namespace) shift; REMOTE_NS="$1"; shift ;;
-    -r|--replace) README_REPLACE=1; shift ;;
-    -u|--usernames) shift; USER_LIST="$1"; shift ;;
+    -l|--update-links) UPDATE_LINKS=1; shift ;;
+    -n|--dry-run) DRY_RUN=1; shift ;;
     --) shift; break ;;
      *) break ;;
   esac
 done
 
-# validate options
-[[ -z "$REMOTE_NS" ]] \
-  && exception "Missing REMOTE_NAMESPACE option" 2
-[[ ! "$REMOTE_NS" =~ ^[a-z0-9]{2,}(/[a-z0-9]{2,}){2,}$ ]] \
-  && exception "Invalid REMOTE_NAMESPACE option" 2
-USERNAMES=0
-for USER in $USER_LIST; do
-  [[ ! "$USER" =~ ^[a-z][a-z0-9_-]{4,}$ ]] \
-    && exception "Unsupported user format, value '$USER'" 2
-  (( USERNAMES++ ))
-done
-[[ $USERNAMES == 0 ]] \
-  && exception "Missing or empty USER_LIST option" 2
+# set and validate arguments
+REMOTE_NS=$1
+PROJECT_FOLDER=$(readlink -f "${2:-.}")
+[[ -n "$REMOTE_NS" ]] \
+  || exception "Missing argument REMOTE_NAMESPACE" 2
+[[ "$REMOTE_NS" =~ ^[a-z0-9]{2,}(/[a-z0-9]{2,})*$ ]] \
+  || exception "Invalid argument REMOTE_NAMESPACE" 2
+[[ -d "$PROJECT_FOLDER" ]] \
+  || exception "Project folder not found."
+[[ $UPDATE_LINKS == 0 || -f "$PROJECT_FOLDER/$README_FILE" ]] \
+  || exception "Readme file not found."
+[[ ! -t 0 ]] \
+  || exception "Missing stdin" 2
 
-# # redir stdin
-# exec 3<&0
-# exec 0</dev/tty
-
-msg_start "Checking environment"
+# check environment and authorize
 check_command "git" \
   || exception "Command git is required"
 check_command "jq" \
   || exception "Command jq is required"
-msg_end
-
-msg_start "Checking paths"
-PROJECT_FOLDER=$(readlink -f "$PROJECT_FOLDER")
-[[ -d "$PROJECT_FOLDER" ]] \
-  || exception "Project folder not found."
-[[ $README_REPLACE == 1 && ! -f "$PROJECT_FOLDER/$README_FILE" ]] \
-  && exception "Readme file not found."
-msg_end
-
 authorize \
   || exception "Unable to authorize"
 TOKEN=$(cat "$TOKEN_PATH")
@@ -441,10 +420,18 @@ GROUP_ID=$(get_group_id "$REMOTE_NS" 2>/dev/null) \
 msg_end
 
 # process users
-for USER in $USER_LIST; do
-  msg_start "Processing repository for $USER"
-  init_user_repo "$USER" "$GROUP_ID" \
-    && update_user_repo "$USER" \
-    || exit 1
-  msg_end
-done
+while read -r LINE; do
+  for USERNAME in $LINE; do
+    msg_start "Processing repository for $USERNAME"
+    [[ ! "$USERNAME" =~ ^[a-z][a-z0-9_-]{4,}$ ]] \
+      && msg_end UNSUPPORTED \
+      && continue
+    [[ $DRY_RUN == 1 ]] \
+      && msg_end SKIPPED \
+      && continue
+    init_user_repo "$USERNAME" "$GROUP_ID" \
+      && update_user_repo "$USERNAME" \
+      || exit 1
+    msg_end
+  done
+done < "/dev/stdin"

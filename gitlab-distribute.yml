@@ -11,7 +11,7 @@ distribute:
     # set git user
     - git config --global user.email "$GITLAB_USER_EMAIL"
     - git config --global user.name "Runner = $CI_RUNNER_DESCRIPTION"
-    # prepare acccess token for update script
+    # prepare acccess token for the distribution script
     - |
         if [[ -z "$ACCESS_TOKEN" ]]; then
           echo "Undefined variable ACCESS_TOKEN"
@@ -28,15 +28,15 @@ distribute:
           git -C $tmpcad checkout "$revision"
         fi
     # set permissions
-    - chmod +x $tmpcad/update.sh
+    - chmod +x $tmpcad/distribute.sh
   script:
     # e.g. /umiami/george/csc220
     - namespace="$(dirname "$PWD" | cut -d/ -f3-)"
     - project_name="$(basename "$PWD")"
     # e.g. fall20
     - branch="$(git rev-parse --abbrev-ref HEAD)"
-    # set project remote for update.sh
+    # set project remote for distribute.sh
     - git remote set-url origin "$namespace/$project_name.git"
     # distribute current project among all users
-    - $tmpcad/update.sh -r -n "$namespace/$branch/$project_name" -u "$USERS"
+    - $tmpcad/distribute.sh --update-links "$namespace/$branch/$project_name" <<< "$CAD_USERS"
   when: manual
