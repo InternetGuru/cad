@@ -347,7 +347,7 @@ USAGE="DESCRIPTION
       This script reads USERNAMES from stdin using IFS. For each USERNAME it distributes files from PROJECT_FOLDER into REMOTE_NAMESPACE/USERNAME. Root namespace in REMOTE_NAMESPACE must exist, meaning e.g. 'umiami' in 'umiami/csc220/fall20'.
 
 USAGE
-      $SCRIPT_NAME [-ahl] REMOTE_NAMESPACE [PROJECT_FOLDER]
+      $SCRIPT_NAME [-ahln] REMOTE_NAMESPACE [PROJECT_FOLDER]
 
 OPTIONS
       -a[WHEN], --assign[=WHEN]
@@ -358,12 +358,15 @@ OPTIONS
 
       -l, --update-links
               Replace all occurrences of the assignment project's remote URL and its current branch with user project's remote URL and its main branch in $README_FILE file.
+
+      -n, --dry-run
+              Only process arguments, options and stdin validation. Would not proceed with create or update user repositories.
 "
 
 # get options
 OPT=$(getopt -n "$0" \
-  -o a:hl \
-  -l assign:,help,update-links \
+  -o a:hln \
+  -l assign:,help,update-links,dry-run \
   -- "$@") \
   && eval set -- "$OPT" \
   || exit 1
@@ -374,6 +377,7 @@ while (( $# > 0 )); do
     -a|--assign) shift; set_assign "$1" || exit 2; shift ;;
     -h|--help) print_usage && exit 0 ;;
     -l|--update-links) UPDATE_LINKS=1; shift ;;
+    -n|--dry-run) DRY_RUN=1; shift ;;
     --) shift; break ;;
      *) break ;;
   esac
