@@ -2,7 +2,7 @@
 
 i=0
 status=
-ga=./distribute.sh
+ga=distribute.sh
 tmp_project=$(mktemp -d)
 
 #######################################
