@@ -390,22 +390,16 @@ PROJECT_FOLDER=$(readlink -f "${2:-.}")
   || exception "Invalid argument REMOTE_NAMESPACE" 2
 [[ -d "$PROJECT_FOLDER" ]] \
   || exception "Project folder not found."
-[[ $UPDATE_LINKS == 1 && ! -f "$PROJECT_FOLDER/$README_FILE" ]] \
-  && exception "Readme file not found."
-[[ -t 0 ]] \
-  && exception "Missing stdin"
+[[ $UPDATE_LINKS == 0 || -f "$PROJECT_FOLDER/$README_FILE" ]] \
+  || exception "Readme file not found."
+[[ ! -t 0 ]] \
+  || exception "Missing stdin"
 
-# # redir stdin
-# exec 3<&0
-# exec 0</dev/tty
-
-msg_start "Checking environment"
+# check environment and authorize
 check_command "git" \
   || exception "Command git is required"
 check_command "jq" \
   || exception "Command jq is required"
-msg_end
-
 authorize \
   || exception "Unable to authorize"
 TOKEN=$(cat "$TOKEN_PATH")
