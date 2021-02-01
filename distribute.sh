@@ -393,7 +393,7 @@ PROJECT_FOLDER=$(readlink -f "${2:-.}")
 [[ $UPDATE_LINKS == 0 || -f "$PROJECT_FOLDER/$README_FILE" ]] \
   || exception "Readme file not found."
 [[ ! -t 0 ]] \
-  || exception "Missing stdin"
+  || exception "Missing stdin" 2
 
 # check environment and authorize
 check_command "git" \
@@ -426,7 +426,7 @@ while read -r LINE; do
     [[ ! "$USERNAME" =~ ^[a-z][a-z0-9_-]{4,}$ ]] \
       && msg_end UNSUPPORTED \
       && continue
-    (( DRY_RUN == 1 )) \
+    [[ $DRY_RUN == 1 ]] \
       && msg_end SKIPPED \
       && continue
     init_user_repo "$USERNAME" "$GROUP_ID" \
