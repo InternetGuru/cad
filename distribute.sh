@@ -50,8 +50,7 @@ print_usage() {
   fmt -w "$(tput cols)" <<< "${USAGE}"
 }
 check_command() {
-  # shellcheck disable=SC2068
-  for cmd in $@; do
+  for cmd in "${@}"; do
     command -v "${cmd}" >/dev/null 2>&1 \
       || exception "Command ${cmd} not found."
   done
@@ -82,9 +81,10 @@ git_add_all() {
     || exception "${out}"
 }
 git_checkout() {
+  declare -r dir="${1}"
+  shift
   declare out
-  # shellcheck disable=SC2086
-  out="$(git -C "${2:-.}" checkout ${1} 2>&1)" \
+  out="$(git -C "$dir" checkout "${@}" 2>&1)" \
     || exception "${out}"
 }
 git_status_empty() {
@@ -94,27 +94,31 @@ git_remote_exists() {
   [[ -n "$(git -C "${2:-.}" config remote."${1:-origin}".url 2>/dev/null)" ]]
 }
 git_pull() {
+  declare -r dir="${1}"
+  shift
   declare out
-  # shellcheck disable=SC2086
-  out="$(git -C "${1:-.}" pull ${2} 2>&1)" \
+  out="$(git -C "${dir}" pull "${@}" 2>&1)" \
     || exception "${out}"
 }
 git_merge() {
+  declare -r dir="${1}"
+  shift
   declare out
-  # shellcheck disable=SC2086
-  out="$(git -C "${2:-.}" merge ${1} 2>&1)" \
+  out="$(git -C "${dir}" merge "${@}" 2>&1)" \
     || exception "${out}"
 }
 git_push() {
+  declare -r dir="${1}"
+  shift
   declare out
-  # shellcheck disable=SC2086
-  out="$(git -C "${2:-.}" push ${1} 2>&1)" \
+  out="$(git -C "${dir}" push "${@}" 2>&1)" \
     || exception "${out}"
 }
 git_commit() {
+  declare -r dir="${1}"
+  shift
   declare out
-  # shellcheck disable=SC2086
-  out="$(git -C "${2:-.}" commit ${3} -m "${1}" 2>&1)" \
+  out="$(git -C "${dir}" commit "${@}" 2>&1)" \
     || exception "${out}"
 }
 git_fetch_all() {
@@ -239,7 +243,7 @@ init_user_repo() {
       || exit 1
     [[ "${actual_remote_ns}" != "${project_ns}" ]] \
       && exception 'Invalid user project remote origin url.'
-    git_pull "${project_folder}" "origin ${SOURCE_BRANCH}:${SOURCE_BRANCH}"
+    git_pull "${project_folder}" 'origin' "${SOURCE_BRANCH}:${SOURCE_BRANCH}"
   else
     # clone existing remote
     declare -r remote_url="https://oauth2:${TOKEN}@${GITLAB_URL}/${project_ns}.git"
@@ -248,12 +252,12 @@ init_user_repo() {
   fi
   # create first commit in case of empty repo (stay on main branch for update)
   if ! git -C "${project_folder}" log >/dev/null 2>&1; then
-    git_commit 'initial commit' "${project_folder}" '--allow-empty'
-    git_push '--all' "${project_folder}"
+    git_commit "${project_folder}" '--allow-empty' '-m "initial commit"'
+    git_push "${project_folder}" '--all'
     return
   fi
   # checkout SOURCE_BRANCH
-  git_checkout "${SOURCE_BRANCH}" "${project_folder}" \
+  git_checkout "${project_folder}" "${SOURCE_BRANCH}" \
     || exception "Missing '${SOURCE_BRANCH}' branch."
 }
 update_links() {
@@ -276,10 +280,10 @@ update_user_repo() {
     && return
   # commit
   git_add_all "${user_dir}"
-  git_commit 'Update assignment' "${user_dir}"
+  git_commit "${user_dir}" '-m "Update assignment"'
   # if first commit create SOURCE_BRANCH on main branch and push both
-  git_checkout "-B ${SOURCE_BRANCH}" "${user_dir}"
-  git_push '--all' "${user_dir}"
+  git_checkout "${user_dir}" "-B ${SOURCE_BRANCH}"
+  git_push "${user_dir}" '--all'
   # create PR iff new commit
   git_same_commit "${user_branch}" "${SOURCE_BRANCH}" "${user_dir}" \
     && return
@@ -290,7 +294,6 @@ update_user_repo() {
     || create_request "${project_id}"
 }
 get_remote_namespace() {
-  # shellcheck disable=SC1087
   git -C "${1}" config --get remote.origin.url | sed "s/^.*${GITLAB_URL}[:/]//;s/.git$//"
 }
 read_issues() {
