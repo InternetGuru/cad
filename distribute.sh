@@ -229,8 +229,8 @@ init_user_repo() {
     project_id="$(create_project "${GROUP_ID}" "${1}" "${user_id}")" \
       && add_developer "${project_id}" "${user_id}" \
       || exit 1
-    [[ "${COPY_ISSUES}" == 'true' ]] \
-      && copy_issues "${project_id}" "${user_id}" \
+    [[ "${COPY_ISSUES}" == 'false' ]] \
+      || copy_issues "${project_id}" "${user_id}" \
       || exit 1
     rm -rf "${project_folder}"
   fi
