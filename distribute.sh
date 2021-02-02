@@ -154,7 +154,7 @@ get_project_id() {
   gitlab_api "api/v4/projects/${1//\//%2F}" | jq .id
 }
 get_default_branch() {
-  gitlab_api "api/v4/projects/${1//\//%2F}" | jq .default_branch
+  gitlab_api "api/v4/projects/${1//\//%2F}" | jq -r .default_branch
 }
 project_exists() {
   get_project_id "${1}" >/dev/null 2>&1
