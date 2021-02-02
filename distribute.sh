@@ -100,6 +100,11 @@ git_pull() {
   out="$(git -C "${dir}" pull "${@}" 2>&1)" \
     || exception "${out}"
 }
+git_clone() {
+  declare out
+  out="$(git clone -q "${@}" 2>&1)" \
+    || exception "${out}"
+}
 git_merge() {
   declare -r dir="${1}"
   shift
@@ -250,8 +255,7 @@ init_user_repo() {
   else
     # clone existing remote
     declare -r remote_url="https://oauth2:${TOKEN}@${GITLAB_URL}/${project_ns}.git"
-    git clone -q "${remote_url}" "${project_folder}" 2>/dev/null \
-      || exception "Unable to clone user project"
+    git_clone "${remote_url}" "${project_folder}"
   fi
   # create first commit in case of empty repo (stay on main branch for update)
   if ! git -C "${project_folder}" log >/dev/null 2>&1; then
