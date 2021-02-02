@@ -260,8 +260,7 @@ init_user_repo() {
     return
   fi
   # checkout SOURCE_BRANCH
-  git_checkout "${project_folder}" "${SOURCE_BRANCH}" \
-    || exception "Missing '${SOURCE_BRANCH}' branch"
+  git_checkout "${project_folder}" "${SOURCE_BRANCH}"
 }
 update_links() {
   sed -i "s~/${PROJECT_NS}/~/${1}/~g" "${2}"
@@ -350,7 +349,7 @@ acquire_token() {
   [[ -s "${TOKEN_FILE}" ]] \
     || authorize
   TOKEN="$(cat "${TOKEN_FILE}")" \
-    || exception 'Unable to read TOKEN_FILE'
+    || exit 1
 }
 process_users() {
   declare username
