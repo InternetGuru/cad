@@ -145,6 +145,9 @@ gitlab_api() {
   printf -- '%s\n' "${output}"
 }
 authorize() {
+  [[ "$(tty)" =~ "not a tty" ]] \
+    && exception "Unable to authorize without TOKEN_FILE"
+  exec 0</dev/tty
   prompt 'Username'
   declare username="${REPLY}"
   prompt 'Password' silent
@@ -464,7 +467,6 @@ declare -r PROJECT_FOLDER="$(readlink -f "${DIRECTORY}")"
 validate_arguments
 # redir stdin
 exec 3<&0
-exec 0</dev/tty
 check_command git jq
 acquire_token
 read_project_info
