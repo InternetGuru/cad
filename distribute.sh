@@ -227,11 +227,9 @@ init_user_repo() {
       || GROUP_ID="$(create_ns "${REMOTE_NS}")" \
       || exit 1
     project_id="$(create_project "${GROUP_ID}" "${1}" "${user_id}")" \
-      && add_developer "${project_id}" "${user_id}" \
-      || exit 1
-    [[ "${COPY_ISSUES}" == 'false' ]] \
-      || copy_issues "${project_id}" "${user_id}" \
-      || exit 1
+      && add_developer "${project_id}" "${user_id}"
+    [[ "${COPY_ISSUES}" == 'true' ]] \
+      && copy_issues "${project_id}" "${user_id}"
     rm -rf "${project_folder}"
   fi
   if [[ -d "${project_folder}" ]]; then
@@ -241,8 +239,7 @@ init_user_repo() {
       || exit 1
     [[ "${actual_remote_ns}" != "${project_ns}" ]] \
       && exception 'Invalid user project remote origin url.'
-    git_pull "${project_folder}" "origin ${SOURCE_BRANCH}:${SOURCE_BRANCH}" \
-      || exit 1
+    git_pull "${project_folder}" "origin ${SOURCE_BRANCH}:${SOURCE_BRANCH}"
   else
     # clone existing remote
     declare -r remote_url="https://oauth2:${TOKEN}@${GITLAB_URL}/${project_ns}.git"
@@ -309,8 +306,7 @@ copy_issues() {
     issue="$(jq ".[${i}] | {title, description, due_date}" <<< "${ISSUES}")"
     [[ -n "${2}" ]] \
       && issue="$(jq --arg a "${2}" '. + {assignee_ids:[$a]}' <<< "${issue}")"
-    gitlab_api "api/v4/projects/${1}/issues" "${issue}" >/dev/null \
-      || exit 1
+    gitlab_api "api/v4/projects/${1}/issues" "${issue}" >/dev/null
   done
 }
 validate_arguments() {
@@ -367,8 +363,7 @@ process_users() {
       && msg_end SKIPPED \
       && continue
     init_user_repo "${username}" \
-      && update_user_repo "${username}" \
-      || exit 1
+      && update_user_repo "${username}"
     msg_end
   done
   (( valid == 0 && invalid == 0 )) \
