@@ -282,7 +282,7 @@ update_user_repo() {
   git_add_all "${user_dir}"
   git_commit "${user_dir}" '-m "Update assignment"'
   # if first commit create SOURCE_BRANCH on main branch and push both
-  git_checkout "${user_dir}" "-B ${SOURCE_BRANCH}"
+  git_checkout "${user_dir}" "-B${SOURCE_BRANCH}"
   git_push "${user_dir}" '--all'
   # create PR iff new commit
   git_same_commit "${user_branch}" "${SOURCE_BRANCH}" "${user_dir}" \
