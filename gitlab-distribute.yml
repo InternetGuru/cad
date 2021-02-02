@@ -3,7 +3,7 @@ distribute:
   stage: distribute
   before_script:
     # fix TERM
-    - export TERM=dumb
+    - export TERM=xterm
     # install requirements
     - apt update && apt install -y curl jq git
     # checkout to current branch
