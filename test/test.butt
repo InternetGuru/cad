@@ -54,10 +54,7 @@ end
 start "missing root namespace"
   debug "echo 'user1' | $ga 'xyz123xyz' '$tmp_project'"
   assert_equal "$status" 1
-  assert_startwith "${errlines[0]}" "a"
-  assert_startwith "${errlines[1]}" "b"
-  assert_startwith "${errlines[2]}" "c"
-  assert_startwith "${errlines[3]}" "d"
+  assert_startwith "${errlines[2]}" "Processing repository for user1 ... Root group xyz123xyz does not exist."
 end
 #######################################
 : $((i++))
