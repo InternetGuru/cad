@@ -135,7 +135,7 @@ gitlab_api() {
   declare status="$(sed -n '$p' <<< "${response}")"
   # shellcheck disable=SC2155
   declare output="$(sed '$d' <<< "${response}")"
-  [[ "${status}" != "20*" ]] \
+  [[ "${status}" != 20* ]] \
     && printf -- '%s\n' "${output}" >&2 \
     && exception "Request status ${status}: ${1}"
   printf -- '%s\n' "${output}"
@@ -147,7 +147,7 @@ authorize() {
   declare password="${REPLY}"
   echo
   gitlab_api 'oauth/token' \
-    "{'grant_type':'password', 'username':'${username}', 'password':'${password}'}" \
+    "{\"grant_type\":\"password\", \"username\":\"${username}\", \"password\":\"${password}\"}" \
     | jq -r '.access_token' > "${TOKEN_FILE}"
 }
 get_project_id() {
@@ -168,15 +168,15 @@ request_exists() {
 }
 create_request() {
   gitlab_api "api/v4/projects/${1}/merge_requests" \
-    "{'id':'${1}', 'source_branch':'${SOURCE_BRANCH}', 'target_branch':'master', \
-    'remove_source_branch':'false', 'title':'Update from ${SOURCE_BRANCH} branch'}" >/dev/null
+    "{\"id\":\"${1}\", \"source_branch\":\"${SOURCE_BRANCH}\", \"target_branch\":\"master\", \
+    \"remove_source_branch\":\"false\", \"title\":\"Update from ${SOURCE_BRANCH} branch\"}" >/dev/null
 }
 create_project() {
   declare visibility='public'
   [[ -n "${3}" ]] \
     && visibility='private'
   gitlab_api 'api/v4/projects' \
-    "{'namespace_id':'${1}', 'name':'${2}', 'visibility':'${visibility}'}" \
+    "{\"namespace_id\":\"${1}\", \"name\":\"${2}\", \"visibility\":\"${visibility}\"}" \
     | jq -r '.id'
 }
 get_role() {
@@ -194,7 +194,7 @@ add_developer() {
 }
 create_group() {
   gitlab_api 'api/v4/groups' \
-    "{'name':'${1}', 'path':'${1}', 'parent_id':'${2}', 'visibility':'public'}" \
+    "{\"name\":\"${1}\", \"path\":\"${1}\", \"parent_id\":\"${2}\", \"visibility\":\"public\"}" \
     | jq -r '.id'
 }
 get_user_id() {
@@ -356,7 +356,7 @@ process_users() {
   declare -i valid=0
   declare -i invalid=0
   # shellcheck disable=SC2013
-  for username in $(cat); do
+  for username in $(cat <&3); do
     msg_start "Processing repository for ${username}"
     [[ ! "${username}" =~ ^[a-z][a-z0-9_-]{4,}$ ]] \
       && msg_end INVALID \
@@ -463,7 +463,11 @@ done
 declare -r REMOTE_NS="${1}"
 # shellcheck disable=SC2155
 declare -r PROJECT_FOLDER="$(readlink -f "${DIRECTORY}")"
+
 validate_arguments
+# redir stdin
+exec 3<&0
+exec 0</dev/tty
 check_command git jq
 acquire_token
 read_project_info
