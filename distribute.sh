@@ -151,16 +151,16 @@ authorize() {
     | jq -r '.access_token' > "${TOKEN_FILE}"
 }
 get_project_id() {
-  gitlab_api "api/v4/projects/${1//\//%2F}" | jq .id
+  gitlab_api "api/v4/projects/${1//\//%2F}" | jq -r '.id'
 }
 get_default_branch() {
-  gitlab_api "api/v4/projects/${1//\//%2F}" | jq -r .default_branch
+  gitlab_api "api/v4/projects/${1//\//%2F}" | jq -r '.default_branch'
 }
 project_exists() {
   get_project_id "${1}" >/dev/null 2>&1
 }
 get_group_id() {
-  gitlab_api "api/v4/groups/${1//\//%2F}" | jq .id
+  gitlab_api "api/v4/groups/${1//\//%2F}" | jq -r '.id'
 }
 request_exists() {
   gitlab_api "api/v4/projects/${1}/merge_requests?state=opened&source_branch=${SOURCE_BRANCH}" \
