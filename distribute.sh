@@ -153,7 +153,7 @@ authorize() {
 get_project_id() {
   gitlab_api "api/v4/projects/${1//\//%2F}" | jq .id
 }
-get_project_branch() {
+get_default_branch() {
   gitlab_api "api/v4/projects/${1//\//%2F}" | jq .default_branch
 }
 project_exists() {
@@ -228,6 +228,8 @@ init_user_repo() {
       || exit 1
     project_id="$(create_project "$GROUP_ID" "$1" "$user_id")" \
       && add_developer "$project_id" "$user_id" \
+      || exit 1
+    [[ "$COPY_ISSUES" == 'true' ]] \
       && copy_issues "$project_id" "$user_id" \
       || exit 1
     rm -rf "$project_folder"
@@ -258,39 +260,34 @@ init_user_repo() {
     || exception "Missing '$SOURCE_BRANCH' branch."
 }
 update_links() {
-  declare -r project_ns="$1"
-  declare -r project_readme="$2/$README_FILE"
-  sed -i "s~/$PROJECT_NS/~/$project_ns/~g" "$project_readme"
-  [[ -z "$PROJECT_BRANCH" ]] \
-    && return
-  declare -r main_branch="$3"
-  sed -i "s~/$PROJECT_BRANCH/\(pipeline\|raw\|file\)~/$main_branch/\1~g" "$project_readme"
-  sed -i "s~ref=$PROJECT_BRANCH~ref=$main_branch~g" "$project_readme"
+  sed -i "s~/$PROJECT_NS/~/$1/~g" "$2"
+  sed -i "s~/$PROJECT_BRANCH/\(pipeline\|raw\|file\)~/$3/\1~g" "$2"
+  sed -i "s~ref=$PROJECT_BRANCH~ref=$3~g" "$2"
 }
 update_user_repo() {
-  declare -r project_ns="$REMOTE_NS/$1"
-  declare -r project_folder="$CACHE_FOLDER/$project_ns"
-  declare main_branch
-  main_branch="$(get_project_branch "project_ns")" \
+  declare -r user_ns="$REMOTE_NS/$1"
+  declare -r user_dir="$CACHE_FOLDER/$user_ns"
+  declare user_branch
+  user_branch="$(get_default_branch "$user_ns")" \
     || exit 1
   # update from assignment
-  rsync -a --delete --exclude .git/ "$PROJECT_FOLDER/" "$project_folder"
+  rsync -a --delete --exclude .git/ "$PROJECT_FOLDER/" "$user_dir"
   # replace remote in readme file
   [[ "$UPDATE_LINKS" == 'true' ]] \
-    && update_links "$project_ns" "$project_folder" "$main_branch"
-  git_status_empty "$project_folder" \
+    && update_links "$user_ns" "$user_dir/$README_FILE" "$user_branch"
+  git_status_empty "$user_dir" \
     && return
   # commit
-  git_add_all "$project_folder"
-  git_commit 'Update assignment' "$project_folder"
+  git_add_all "$user_dir"
+  git_commit 'Update assignment' "$user_dir"
   # if first commit create SOURCE_BRANCH on main branch and push both
-  git_checkout "-B $SOURCE_BRANCH" "$project_folder"
-  git_push '--all' "$project_folder"
+  git_checkout "-B $SOURCE_BRANCH" "$user_dir"
+  git_push '--all' "$user_dir"
   # create PR iff new commit
-  git_same_commit "$main_branch" "$SOURCE_BRANCH" "$project_folder" \
+  git_same_commit "$user_branch" "$SOURCE_BRANCH" "$user_dir" \
     && return
   declare project_id
-  project_id="$(get_project_id "$project_ns")" \
+  project_id="$(get_project_id "$user_ns")" \
     || exit 1
   request_exists "$project_id" \
     || create_request "$project_id"
@@ -300,9 +297,6 @@ get_remote_namespace() {
   git -C "$1" config --get remote.origin.url | sed "s/^.*$GITLAB_URL[:/]//;s/.git$//"
 }
 read_issues() {
-  [[ -z "$PROJECT_ID" ]] \
-    && ISSUES_COUNT=0 \
-    && return
   ISSUES="$(gitlab_api "api/v4/projects/$PROJECT_ID/issues?labels=assignment")" \
     && ISSUES_COUNT="$(jq length <<< "$ISSUES")" \
     || exit 1
@@ -329,6 +323,10 @@ validate_arguments() {
     || exception 'Project folder not found.'
   [[ "$ASSIGN" =~ ^($ALWAYS|$NEVER|$AUTO)$ ]] \
     || exception 'Invalid option ASSIGN.'
+  [[ "$COPY_ISSUES" == 'false' || -d "$PROJECT_FOLDER/.git" ]] \
+    || exception 'To copy issues, project must be a git repository.'
+  [[ "$UPDATE_LINKS" == 'false' || -d "$PROJECT_FOLDER/.git" ]] \
+    || exception 'To update links, project must be a git repository.'
   [[ "$UPDATE_LINKS" == 'false' || -f "$PROJECT_FOLDER/$README_FILE" ]] \
     || exception 'Readme file not found.'
   [[ ! -t 0 ]] \
@@ -337,7 +335,7 @@ validate_arguments() {
 }
 read_project_info() {
   msg_start 'Getting project information'
-  [[ ! -d "$PROJECT_FOLDER/.git" ]] \
+  [[ "$COPY_ISSUES" == 'false' && "$UPDATE_LINKS" == 'false' ]] \
     && msg_end SKIPPED \
     && return
   PROJECT_NS="$(get_remote_namespace "$PROJECT_FOLDER")" \
@@ -394,6 +392,7 @@ declare -r AUTO='auto'
 # default variables
 declare DIRECTORY='.'
 declare DRY_RUN='false'
+declare COPY_ISSUES='false'
 declare UPDATE_LINKS='false'
 declare MSG_OPENED='false'
 declare ASSIGN="$AUTO"
@@ -409,7 +408,7 @@ declare -r USAGE="DESCRIPTION
       This script reads USERNAMES from stdin using IFS. For each USERNAME it distributes files from PROJECT_FOLDER into REMOTE_NAMESPACE/USERNAME. Root namespace in REMOTE_NAMESPACE must exist, meaning e.g. 'umiami' in 'umiami/csc220/fall20'.
 
 USAGE
-      $SCRIPT_NAME [-adhln] REMOTE_NAMESPACE
+      $SCRIPT_NAME [-adhiln] REMOTE_NAMESPACE
 
 OPTIONS
       -a[WHEN], --assign[=WHEN]
@@ -421,8 +420,11 @@ OPTIONS
       -h, --help
               Display usage.
 
+      -i, --process-issues
+              Look for GitLab issues in the PROJECT_FOLDER. If PROJECT_FOLDER is a GitLab repository, copy issues marked with 'assignment' label into destination repositories.
+
       -l, --update-links
-              Replace all occurrences of the assignment project's remote URL and its current branch with user project's remote URL and its main branch in $README_FILE file.
+              Look for a $README_FILE if the PROJECT_FOLDER is a GitLab repository. Replace all occurrences of the assignment project's remote URL and its current branch with destination repository remote URL and its main branch.
 
       -n, --dry-run
               Only process arguments, options and stdin validation. Would not proceed with create or update user repositories.
@@ -437,8 +439,8 @@ EXIT CODES
 
 # get options
 declare OPT
-OPT="$(getopt --name "$0" --options 'a:d:hln' \
-  --longoptions 'assign:,directory:,help,update-links,dry-run' \
+OPT="$(getopt --name "$0" --options 'a:d:hiln' \
+  --longoptions 'assign:,directory:,help,process-issues,update-links,dry-run' \
   -- "$@")" \
   && eval set -- "$OPT" \
   || exit 1
@@ -449,6 +451,7 @@ while (( $# > 0 )); do
     -a|--assign) shift; ASSIGN="$1"; shift ;;
     -d|--directory) shift; DIRECTORY="$1"; shift ;;
     -h|--help) print_usage && exit 0 ;;
+    -i|--process-issues) COPY_ISSUES='true'; shift ;;
     -l|--update-links) UPDATE_LINKS='true'; shift ;;
     -n|--dry-run) DRY_RUN='true'; shift ;;
     --) shift; break ;;
