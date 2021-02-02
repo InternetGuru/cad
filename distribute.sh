@@ -9,13 +9,13 @@ clear_stdin() {
 }
 msg_start() {
   [[ "${MSG_OPENED}" == 'true' ]] \
-    && exception 'Message already started.'
+    && exception 'Message already started'
   MSG_OPENED='true'
   printf -- '%s ... ' "$@" >&2
 }
 msg_end() {
   [[ "${MSG_OPENED}" == 'false' ]] \
-    && exception 'Message not started.'
+    && exception 'Message not started'
   MSG_OPENED='false'
   printf -- '[ %s ]\n' "${1:-DONE}" >&2
 }
@@ -43,7 +43,7 @@ prompt() {
   prompt "${1}"
 }
 exception() {
-  printf -- '%s [ EXIT#%d ]\n' "${1:-${SCRIPT_NAME} Unknown exception.}" "${2:-1}" >&2
+  printf -- '%s in %s() [ #%d ]\n' "${1:-${SCRIPT_NAME} unknown exception}" "${FUNCNAME[1]}" "${2:-1}" >&2
   exit "${2:-1}"
 }
 print_usage() {
@@ -52,7 +52,7 @@ print_usage() {
 check_command() {
   for cmd in "${@}"; do
     command -v "${cmd}" >/dev/null 2>&1 \
-      || exception "Command ${cmd} not found."
+      || exception "Command ${cmd} not found"
   done
 }
 git_repo_exists() {
@@ -209,7 +209,7 @@ create_ns() {
   # shellcheck disable=SC2155
   declare -r parent_ns="$(dirname "${1}")"
   [[ "${parent_ns}" == '.' ]] \
-    && exception "Root group ${1} does not exist."
+    && exception "Root group ${1} does not exist"
   declare parent_id
   parent_id="$(get_group_id "${parent_ns}" 2>/dev/null)" \
     || parent_id="$(create_ns "${parent_ns}")" \
@@ -225,7 +225,7 @@ init_user_repo() {
       || user_id="$(get_user_id "${1}")" \
       || exit 1
     [[ "${ASSIGN}" == "${ALWAYS}" && -z "${user_id}" ]] \
-      && exception "User ${1} does not exist."
+      && exception "User ${1} does not exist"
     [[ -n "${GROUP_ID}" ]] \
       || GROUP_ID="$(get_group_id "${REMOTE_NS}" 2>/dev/null)" \
       || GROUP_ID="$(create_ns "${REMOTE_NS}")" \
@@ -242,13 +242,13 @@ init_user_repo() {
     actual_remote_ns="$(get_remote_namespace "${project_folder}")" \
       || exit 1
     [[ "${actual_remote_ns}" != "${project_ns}" ]] \
-      && exception 'Invalid user project remote origin url.'
+      && exception 'Invalid user project remote origin url'
     git_pull "${project_folder}" 'origin' "${SOURCE_BRANCH}:${SOURCE_BRANCH}"
   else
     # clone existing remote
     declare -r remote_url="https://oauth2:${TOKEN}@${GITLAB_URL}/${project_ns}.git"
     git clone -q "${remote_url}" "${project_folder}" 2>/dev/null \
-      || exception "Unable to clone user project."
+      || exception "Unable to clone user project"
   fi
   # create first commit in case of empty repo (stay on main branch for update)
   if ! git -C "${project_folder}" log >/dev/null 2>&1; then
@@ -258,7 +258,7 @@ init_user_repo() {
   fi
   # checkout SOURCE_BRANCH
   git_checkout "${project_folder}" "${SOURCE_BRANCH}" \
-    || exception "Missing '${SOURCE_BRANCH}' branch."
+    || exception "Missing '${SOURCE_BRANCH}' branch"
 }
 update_links() {
   sed -i "s~/${PROJECT_NS}/~/${1}/~g" "${2}"
@@ -315,21 +315,21 @@ copy_issues() {
 validate_arguments() {
   msg_start 'Validating arguments'
   [[ -n "${REMOTE_NS}" ]] \
-    || exception 'Missing argument REMOTE_NAMESPACE.' 2
+    || exception 'Missing argument REMOTE_NAMESPACE' 2
   [[ "${REMOTE_NS}" =~ ^[a-z0-9]{2,}(/[a-z0-9]{2,})*$ ]] \
-    || exception 'Invalid argument REMOTE_NAMESPACE.' 2
+    || exception 'Invalid argument REMOTE_NAMESPACE' 2
   [[ -d "${PROJECT_FOLDER}" ]] \
-    || exception 'Project folder not found.'
+    || exception 'Project folder not found'
   [[ "${ASSIGN}" =~ ^(${ALWAYS}|${NEVER}|${AUTO})$ ]] \
-    || exception 'Invalid option ASSIGN.'
+    || exception 'Invalid option ASSIGN'
   [[ "${COPY_ISSUES}" == 'false' || -d "${PROJECT_FOLDER}/.git" ]] \
-    || exception 'To copy issues, project must be a git repository.'
+    || exception 'To copy issues, project must be a git repository'
   [[ "${UPDATE_LINKS}" == 'false' || -d "${PROJECT_FOLDER}/.git" ]] \
-    || exception 'To update links, project must be a git repository.'
+    || exception 'To update links, project must be a git repository'
   [[ "${UPDATE_LINKS}" == 'false' || -f "${PROJECT_FOLDER}/${README_FILE}" ]] \
-    || exception 'Readme file not found.'
+    || exception 'Readme file not found'
   [[ ! -t 0 ]] \
-    || exception 'Missing stdin.' 2
+    || exception 'Missing stdin' 2
   msg_end
 }
 read_project_info() {
@@ -345,10 +345,9 @@ read_project_info() {
 }
 acquire_token() {
   [[ -s "${TOKEN_FILE}" ]] \
-    || authorize \
-    || exception 'Unable to authorize.'
+    || authorize
   TOKEN="$(cat "${TOKEN_FILE}")" \
-    || exception 'Unable to read TOKEN_FILE.'
+    || exception 'Unable to read TOKEN_FILE'
 }
 process_users() {
   declare username
@@ -370,9 +369,9 @@ process_users() {
     msg_end
   done
   (( valid == 0 && invalid == 0 )) \
-    && exception 'Empty or invalid stdin.' 2
+    && exception 'Empty or invalid stdin' 2
   (( invalid > 0 )) \
-    && exception "Invalid username occurred ${invalid} time(s)." 3
+    && exception "Invalid username occurred ${invalid} time(s)" 3
 }
 
 # global constants
