@@ -22,7 +22,7 @@ end
 start "missing remote namespace"
   debug "echo 'user1' | $ga"
   assert_equal "$status" 2
-  assert_startwith "${errlines[0]}" "EXCEPTION: Missing argument REMOTE_NAMESPACE"
+  assert_startwith "${errlines[0]}" "Validating arguments ... Missing argument REMOTE_NAMESPACE."
 end
 #######################################
 # : $((i++))
@@ -47,21 +47,21 @@ end
 start "invalid remote namespace format"
   debug "echo 'user1' | $ga '1' '$tmp_project'"
   assert_equal "$status" 2
-  assert_startwith "${errlines[0]}" "EXCEPTION: Invalid argument REMOTE_NAMESPACE"
+  assert_startwith "${errlines[0]}" "Validating arguments ... Invalid argument REMOTE_NAMESPACE."
 end
 #######################################
 : $((i++))
 start "missing root namespace"
   debug "echo 'user1' | $ga 'xyz123xyz' '$tmp_project'"
   assert_equal "$status" 1
-  assert_startwith "${errlines[1]}" "Processing namespace ... EXCEPTION: Root group xyz123xyz does not exist"
+  assert_startwith "${errlines[2]}" "Processing repository for user1 ... Root group xyz123xyz does not exist."
 end
 #######################################
 : $((i++))
 start "invalid project path"
-  debug "echo 'user1' | $ga '$correct_ns' '/foo'"
+  debug "echo 'user1' | $ga '$correct_ns' -d '/foo'"
   assert_equal "$status" 1
-  assert_startwith "${errlines[0]}" "EXCEPTION: Project folder not found."
+  assert_startwith "${errlines[0]}" "Validating arguments ... Project folder not found."
 end
 #######################################
 ## Requirements
