@@ -202,7 +202,7 @@ add_developer() {
   (( role >= 30 )) \
     && return
   gitlab_api "api/v4/projects/${1}/members" \
-    "{'access_level':'30', 'user_id':'${2}'}" >/dev/null
+    "{\"access_level\":\"30\", \"user_id\":\"${2}\"}" >/dev/null
 }
 create_group() {
   gitlab_api 'api/v4/groups' \
