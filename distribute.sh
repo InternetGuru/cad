@@ -362,7 +362,7 @@ process_users() {
   # shellcheck disable=SC2013
   for username in $(cat <&3); do
     msg_start "Processing repository for ${username}"
-    [[ ! "${username}" =~ ^[a-z][a-z0-9_-]{4,}$ ]] \
+    [[ ! "${username}" =~ ^[a-zA-Z0-9][a-z0-9_.-]*$ ]] \
       && msg_end INVALID \
       && invalid+=1 \
       && continue
