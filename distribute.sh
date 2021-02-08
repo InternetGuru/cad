@@ -202,7 +202,7 @@ add_developer() {
   (( role >= 30 )) \
     && return
   gitlab_api "api/v4/projects/${1}/members" \
-    "{'access_level':'30', 'user_id':'${2}'}" >/dev/null
+    "{\"access_level\":\"30\", \"user_id\":\"${2}\"}" >/dev/null
 }
 create_group() {
   gitlab_api 'api/v4/groups' \
@@ -362,7 +362,7 @@ process_users() {
   # shellcheck disable=SC2013
   for username in $(cat <&3); do
     msg_start "Processing repository for ${username}"
-    [[ ! "${username}" =~ ^[a-z][a-z0-9_-]{4,}$ ]] \
+    [[ ! "${username}" =~ ^[a-zA-Z0-9][a-z0-9_.-]*$ ]] \
       && msg_end INVALID \
       && invalid+=1 \
       && continue
